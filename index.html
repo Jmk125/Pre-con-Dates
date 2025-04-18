@@ -10,7 +10,7 @@
     <div class="container">
         <!-- User info with current date/time and username -->
         <div class="user-info">
-            User: <span id="current-user">Jmk125</span> | Date: <span id="current-datetime">2025-04-18 17:53:45</span>
+            User: <span id="current-user">Jmk125</span> | Date: <span id="current-datetime">2025-04-18 21:10:58</span>
         </div>
 
         <h1>Pre-Construction Project Timeline</h1>
@@ -52,6 +52,9 @@
             Current Date: <span id="current-date-value">2025-04-18</span>
         </div>
         
+        <!-- Tooltip for showing dates -->
+        <div id="tooltip" class="tooltip"></div>
+        
         <!-- Project form modal -->
         <div id="project-modal" class="modal">
             <div class="modal-content">
@@ -61,6 +64,12 @@
                     <div class="form-group">
                         <label for="project-name">Project Name:</label>
                         <input type="text" id="project-name" required>
+                    </div>
+                    
+                    <div class="form-group checkbox-group">
+                        <label for="project-potential">Potential Project:</label>
+                        <input type="checkbox" id="project-potential">
+                        <span class="checkbox-hint">(Marks project as not confirmed)</span>
                     </div>
                     
                     <h3>Activities</h3>
@@ -98,9 +107,6 @@
     
     <!-- Load libraries -->
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/dayjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/interact.js@1.2.8/dist/interact.min.js"></script>
-    
-    <!-- Load app scripts -->
     <script src="app.js"></script>
 </body>
 </html>
