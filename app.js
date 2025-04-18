@@ -19,10 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteProjectBtn = document.getElementById('delete-project');
     const currentUser = document.getElementById('current-user');
     const currentDateTime = document.getElementById('current-datetime');
+    const projectPotentialCheckbox = document.getElementById('project-potential');
+    const tooltip = document.getElementById('tooltip');
     
-    // Initialize user info and date display
+    // Initialize user info and date display with updated time
     currentUser.textContent = 'Jmk125';
-    currentDateTime.textContent = '2025-04-18 17:53:45';
+    currentDateTime.textContent = '2025-04-18 21:15:14';
     currentDateDisplay.textContent = '2025-04-18';
     
     // App state
@@ -32,6 +34,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let zoomLevel = 100; // Percentage
     let startDate = null;
     let endDate = null;
+    let activeBar = null; // Track active bar for drag operations
+    let isDragging = false;
+    let isResizingLeft = false;
+    let isResizingRight = false;
     
     // Activity types with shorter display labels
     const activityTypes = [
@@ -199,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createLegend() {
         legendContainer.innerHTML = '';
         
+        // Add activity type legend items
         activityTypes.forEach(type => {
             const legendItem = document.createElement('div');
             legendItem.className = 'legend-item';
@@ -213,6 +220,20 @@ document.addEventListener('DOMContentLoaded', () => {
             legendItem.appendChild(legendLabel);
             legendContainer.appendChild(legendItem);
         });
+        
+        // Add potential project legend item
+        const potentialLegendItem = document.createElement('div');
+        potentialLegendItem.className = 'legend-item';
+        
+        const potentialLegendColor = document.createElement('div');
+        potentialLegendColor.className = 'legend-color potential';
+        
+        const potentialLegendLabel = document.createElement('div');
+        potentialLegendLabel.textContent = 'Potential Project';
+        
+        potentialLegendItem.appendChild(potentialLegendColor);
+        potentialLegendItem.appendChild(potentialLegendLabel);
+        legendContainer.appendChild(potentialLegendItem);
     }
     
     // Render projects
@@ -234,6 +255,11 @@ document.addEventListener('DOMContentLoaded', () => {
         projects.forEach((project, index) => {
             const projectRow = document.createElement('div');
             projectRow.className = 'project-row';
+            
+            // Add potential class if project is marked as potential
+            if (project.potential) {
+                projectRow.classList.add('potential');
+            }
             
             // Add project name
             const projectName = document.createElement('div');
@@ -258,6 +284,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     activityBar.className = `activity-bar ${type.id}`;
                     activityBar.dataset.project = index;
                     activityBar.dataset.activity = type.id;
+                    activityBar.dataset.start = project[`${type.id}Start`];
+                    activityBar.dataset.end = project[`${type.id}End`];
                     activityBar.style.left = `${startPosition}px`;
                     activityBar.style.width = `${width}px`;
                     
@@ -275,6 +303,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     activityBar.appendChild(rightHandle);
                     activityBar.appendChild(activityLabel);
                     projectTimeline.appendChild(activityBar);
+                    
+                    // Add tooltip event listeners
+                    activityBar.addEventListener('mouseenter', showTooltip);
+                    activityBar.addEventListener('mousemove', moveTooltip);
+                    activityBar.addEventListener('mouseleave', hideTooltip);
                 }
             });
             
@@ -287,106 +320,198 @@ document.addEventListener('DOMContentLoaded', () => {
         initDraggable();
     }
     
-    // Initialize draggable activities
+    // Show tooltip with date information
+    function showTooltip(event) {
+        if (!isDragging && !isResizingLeft && !isResizingRight) {
+            const bar = event.currentTarget;
+            updateTooltipContent(bar);
+            tooltip.style.display = 'block';
+            moveTooltip(event);
+        }
+    }
+    
+    // Update tooltip content based on bar's current position
+    function updateTooltipContent(bar) {
+        // Get activity type and dates
+        const activityType = bar.dataset.activity;
+        const activity = activityTypes.find(type => type.id === activityType);
+        
+        // Calculate current dates based on position
+        const left = parseInt(bar.style.left) || 0;
+        const width = parseInt(bar.style.width) || 0;
+        
+        const startDate = getDateFromPosition(left);
+        const endDate = getDateFromPosition(left + width);
+        
+        // Update tooltip content
+        tooltip.innerHTML = `
+            <strong>${activity.name}</strong><br>
+            Start: ${formatDate(startDate)}<br>
+            End: ${formatDate(endDate)}
+        `;
+        
+        // Store current dates in dataset for reference
+        bar.dataset.start = startDate;
+        bar.dataset.end = endDate;
+    }
+    
+    // Move tooltip with mouse - position above cursor
+    function moveTooltip(event) {
+        // Position the tooltip above the cursor
+        tooltip.style.left = event.pageX + 'px';
+        tooltip.style.top = (event.pageY - 75) + 'px'; // Position 75px above the cursor
+    }
+    
+    // Hide tooltip
+    function hideTooltip() {
+        if (!isDragging && !isResizingLeft && !isResizingRight) {
+            tooltip.style.display = 'none';
+        }
+    }
+    
+    // Format date for display
+    function formatDate(dateStr) {
+        const date = dayjs(dateStr);
+        return date.format('MMM D, YYYY');
+    }
+    
+    // Initialize draggable activities with improved drag handling
     function initDraggable() {
-        // Make activity bars draggable
-        interact('.activity-bar')
-            .draggable({
-                inertia: true,
-                modifiers: [
-                    interact.modifiers.restrictRect({
-                        restriction: 'parent',
-                        endOnly: true
-                    })
-                ],
-                autoScroll: false, // No auto-scroll
-                onmove: dragMoveListener,
-                onend: function (event) {
-                    const target = event.target;
-                    const projectIndex = parseInt(target.dataset.project);
-                    const activityType = target.dataset.activity;
-                    
-                    // Update project dates based on new position
-                    const left = parseInt(target.style.left);
-                    const width = parseInt(target.style.width);
-                    
-                    projects[projectIndex][`${activityType}Start`] = getDateFromPosition(left);
-                    projects[projectIndex][`${activityType}End`] = getDateFromPosition(left + width);
-                    
-                    // Save to local storage
-                    saveToLocalStorage();
-                    
-                    // Check if we need to update date range and re-render
-                    const newStartDate = dayjs(projects[projectIndex][`${activityType}Start`]);
-                    const newEndDate = dayjs(projects[projectIndex][`${activityType}End`]);
-                    
-                    if (newStartDate.isBefore(startDate) || newEndDate.isAfter(endDate)) {
-                        renderTimeline();
-                    }
-                }
-            });
+        // Clear any existing document-level event listeners
+        document.removeEventListener('mousemove', documentMouseMove);
+        document.removeEventListener('mouseup', documentMouseUp);
         
-        // Make activity bars resizable
-        interact('.activity-bar')
-            .resizable({
-                edges: { left: '.resize-handle.left', right: '.resize-handle.right', bottom: false, top: false },
-                modifiers: [
-                    interact.modifiers.restrictSize({
-                        min: { width: 10 }
-                    })
-                ],
-                inertia: true
-            })
-            .on('resizemove', resizeMoveListener)
-            .on('resizeend', function (event) {
-                const target = event.target;
-                const projectIndex = parseInt(target.dataset.project);
-                const activityType = target.dataset.activity;
-                
-                // Update project dates based on new size
-                const left = parseInt(target.style.left);
-                const width = parseInt(target.style.width);
-                
-                projects[projectIndex][`${activityType}Start`] = getDateFromPosition(left);
-                projects[projectIndex][`${activityType}End`] = getDateFromPosition(left + width);
-                
-                // Save to local storage
-                saveToLocalStorage();
-                
-                // Check if we need to update date range and re-render
-                const newStartDate = dayjs(projects[projectIndex][`${activityType}Start`]);
-                const newEndDate = dayjs(projects[projectIndex][`${activityType}End`]);
-                
-                if (newStartDate.isBefore(startDate) || newEndDate.isAfter(endDate)) {
-                    renderTimeline();
-                }
-            });
+        // Add document-level event listeners for drag operations
+        document.addEventListener('mousemove', documentMouseMove);
+        document.addEventListener('mouseup', documentMouseUp);
+        
+        // Set up drag handlers for each activity bar
+        const activityBars = document.querySelectorAll('.activity-bar');
+        
+        activityBars.forEach(bar => {
+            // Remove existing listeners to prevent duplicates
+            bar.removeEventListener('mousedown', barMouseDown);
+            
+            // Add mousedown event listener
+            bar.addEventListener('mousedown', barMouseDown);
+        });
     }
     
-    function dragMoveListener(event) {
-        const target = event.target;
+    // Mouse down event handler for activity bars
+    function barMouseDown(e) {
+        // Store reference to the clicked bar
+        activeBar = this;
         
-        // Update element position
-        target.style.left = (parseFloat(target.style.left) || 0) + event.dx + 'px';
-    }
-    
-    function resizeMoveListener(event) {
-        const target = event.target;
-        
-        // Get current size and position
-        let x = parseFloat(target.style.left) || 0;
-        let width = parseFloat(target.style.width) || 0;
-        
-        // Update the element's position and size
-        if (event.edges.left) {
-            x += event.deltaRect.left;
-            width -= event.deltaRect.left;
-            target.style.left = x + 'px';
+        // Determine what type of action we're performing
+        if (e.target.classList.contains('resize-handle')) {
+            if (e.target.classList.contains('left')) {
+                isResizingLeft = true;
+            } else if (e.target.classList.contains('right')) {
+                isResizingRight = true;
+            }
         } else {
-            width += event.deltaRect.right;
+            isDragging = true;
         }
         
-        target.style.width = width + 'px';
+        // Store initial state
+        const rect = activeBar.getBoundingClientRect();
+        activeBar.dataset.startX = e.clientX;
+        activeBar.dataset.initialLeft = parseInt(activeBar.style.left) || 0;
+        activeBar.dataset.initialWidth = parseInt(activeBar.style.width) || rect.width;
+        
+        // Show tooltip immediately
+        updateTooltipContent(activeBar);
+        tooltip.style.display = 'block';
+        tooltip.classList.add('drag-active');
+        moveTooltip(e);
+        
+        e.preventDefault(); // Prevent text selection
+    }
+    
+    // Mouse move event handler (document level)
+    function documentMouseMove(e) {
+        if (!activeBar || (!isDragging && !isResizingLeft && !isResizingRight)) return;
+        
+        // Calculate movement
+        const startX = parseInt(activeBar.dataset.startX) || 0;
+        const initialLeft = parseInt(activeBar.dataset.initialLeft) || 0;
+        const initialWidth = parseInt(activeBar.dataset.initialWidth) || 100;
+        const dx = e.clientX - startX;
+        
+        if (isDragging) {
+            // When dragging, update the left position
+            activeBar.style.left = (initialLeft + dx) + 'px';
+        } else if (isResizingLeft) {
+            // When resizing from the left, update both left and width
+            const newLeft = initialLeft + dx;
+            const newWidth = initialWidth - dx;
+            
+            // Ensure minimum width
+            if (newWidth >= 20) {
+                activeBar.style.left = newLeft + 'px';
+                activeBar.style.width = newWidth + 'px';
+            }
+        } else if (isResizingRight) {
+            // When resizing from the right, update only the width
+            const newWidth = initialWidth + dx;
+            
+            // Ensure minimum width
+            if (newWidth >= 20) {
+                activeBar.style.width = newWidth + 'px';
+            }
+        }
+        
+        // Update tooltip in real-time during drag/resize
+        if (activeBar) {
+            updateTooltipContent(activeBar);
+            moveTooltip(e);
+        }
+        
+        e.preventDefault();
+    }
+    
+    // Mouse up event handler (document level)
+    function documentMouseUp(e) {
+        if (!activeBar) return;
+        
+        if (isDragging || isResizingLeft || isResizingRight) {
+            // Update project data when dragging or resizing ends
+            const projectIndex = parseInt(activeBar.dataset.project);
+            const activityType = activeBar.dataset.activity;
+            
+            const left = parseInt(activeBar.style.left);
+            const width = parseInt(activeBar.style.width);
+            
+            // Calculate new dates
+            const newStartDate = getDateFromPosition(left);
+            const newEndDate = getDateFromPosition(left + width);
+            
+            // Update the project data
+            projects[projectIndex][`${activityType}Start`] = newStartDate;
+            projects[projectIndex][`${activityType}End`] = newEndDate;
+            
+            // Update the data attributes for tooltips
+            activeBar.dataset.start = newStartDate;
+            activeBar.dataset.end = newEndDate;
+            
+            // Save changes
+            saveToLocalStorage();
+            
+            // Check if we need to update date range and re-render
+            if (dayjs(newStartDate).isBefore(startDate) || dayjs(newEndDate).isAfter(endDate)) {
+                renderTimeline();
+            }
+        }
+        
+        // Hide tooltip after operation completes
+        tooltip.style.display = 'none';
+        tooltip.classList.remove('drag-active');
+        
+        // Reset flags and active bar
+        isDragging = false;
+        isResizingLeft = false;
+        isResizingRight = false;
+        activeBar = null;
     }
     
     // Show add project modal
@@ -407,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const project = projects[index];
         
         document.getElementById('project-name').value = project.name;
+        document.getElementById('project-potential').checked = project.potential || false;
         
         activityTypes.forEach(type => {
             if (project[`${type.id}Start`]) {
@@ -450,7 +576,8 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         
         const projectData = {
-            name: document.getElementById('project-name').value
+            name: document.getElementById('project-name').value,
+            potential: document.getElementById('project-potential').checked
         };
         
         activityTypes.forEach(type => {
