@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pre-Construction Project Timeline</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- User info with current date/time and username -->
+        <div class="user-info">
+            User: <span id="current-user">Jmk125</span> | Date: <span id="current-datetime">2025-04-18 17:53:45</span>
+        </div>
+
+        <h1>Pre-Construction Project Timeline</h1>
+        
+        <div class="controls">
+            <div class="main-controls">
+                <button id="add-project">Add Project</button>
+                <button id="save-data">Save Projects</button>
+                <button id="load-data">Load Projects</button>
+                <input type="file" id="file-input" style="display: none;">
+            </div>
+            
+            <div class="zoom-controls">
+                <button id="zoom-out">−</button>
+                <span id="zoom-level">100%</span>
+                <button id="zoom-in">+</button>
+                <button id="zoom-fit">Fit All</button>
+            </div>
+        </div>
+
+        <div class="timeline-container">
+            <!-- Header with project names and timeline -->
+            <div class="timeline-header">
+                <div class="project-name-header">Project Name</div>
+                <div class="timeline-dates-wrapper">
+                    <div class="timeline-dates" id="timeline-dates"></div>
+                </div>
+            </div>
+            
+            <!-- Projects container -->
+            <div class="project-list" id="projects-container"></div>
+        </div>
+        
+        <!-- Legend (single instance) -->
+        <div class="legend" id="legend-container"></div>
+        
+        <!-- Current date display -->
+        <div class="current-date-display">
+            Current Date: <span id="current-date-value">2025-04-18</span>
+        </div>
+        
+        <!-- Project form modal -->
+        <div id="project-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2 id="modal-title">Add Project</h2>
+                <form id="project-form">
+                    <div class="form-group">
+                        <label for="project-name">Project Name:</label>
+                        <input type="text" id="project-name" required>
+                    </div>
+                    
+                    <h3>Activities</h3>
+                    <div class="activity-inputs">
+                        <div class="form-group">
+                            <label for="sd-start">Schematic Design:</label>
+                            <input type="date" id="sd-start" placeholder="Start Date">
+                            <input type="date" id="sd-end" placeholder="End Date">
+                        </div>
+                        <div class="form-group">
+                            <label for="dd-start">Design Development:</label>
+                            <input type="date" id="dd-start" placeholder="Start Date">
+                            <input type="date" id="dd-end" placeholder="End Date">
+                        </div>
+                        <div class="form-group">
+                            <label for="gmp-start">GMP:</label>
+                            <input type="date" id="gmp-start" placeholder="Start Date">
+                            <input type="date" id="gmp-end" placeholder="End Date">
+                        </div>
+                        <div class="form-group">
+                            <label for="bidding-start">Bidding:</label>
+                            <input type="date" id="bidding-start" placeholder="Start Date">
+                            <input type="date" id="bidding-end" placeholder="End Date">
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="save-btn">Save Project</button>
+                        <button type="button" id="delete-project" class="delete-btn">Delete Project</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/interact.js@1.2.8/dist/interact.min.js"></script>
+    
+    <!-- Load app scripts -->
+    <script src="app.js"></script>
+</body>
+</html>
