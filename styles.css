@@ -515,3 +515,53 @@ input[type="date"] {
 .unsaved-changes .controls {
     border-bottom: 2px solid #4caf50;
 }
+/* Add these styles to your existing styles.css file */
+
+/* Publish button styling */
+#publish-data {
+    background-color: #4caf50;
+    color: white;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+#publish-data:hover {
+    background-color: #45a049;
+}
+
+/* Unsaved changes indicator */
+#publish-data.has-changes {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    }
+}
+
+/* Visual indicator for the body when there are unsaved changes */
+.unsaved-changes .controls {
+    border-bottom: 2px solid #4caf50;
+}
+
+/* Highlight the user info when a publish happens */
+.user-info.just-published {
+    background-color: rgba(76, 175, 80, 0.2);
+    animation: fadeHighlight 3s;
+}
+
+@keyframes fadeHighlight {
+    0% {
+        background-color: rgba(76, 175, 80, 0.5);
+    }
+    100% {
+        background-color: rgba(76, 175, 80, 0);
+    }
+}
