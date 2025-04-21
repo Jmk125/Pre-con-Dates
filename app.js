@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     // DOM elements
     const addProjectBtn = document.getElementById('add-project');
-    const saveDataBtn = document.getElementById('save-data');
+    const exportDataBtn = document.getElementById('export-data'); // Changed from save-data to export-data
+    const publishDataBtn = document.getElementById('publish-data'); // Added new button
     const loadDataBtn = document.getElementById('load-data');
     const fileInput = document.getElementById('file-input');
     const projectsContainer = document.getElementById('projects-container');
@@ -24,8 +25,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const tooltip = document.getElementById('tooltip');
     
     // Initialize user info and date display
-    currentUser.textContent = 'Jmk125';
-    currentDateTime.textContent = '2025-04-19 04:57:59';
+    const username = 'Jmk125';
+    const currentTimeFormatted = getCurrentDateTime();
+    currentUser.textContent = username;
+    currentDateTime.textContent = currentTimeFormatted;
     
     // App state
     let projects = [];
@@ -38,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDragging = false;
     let isResizingLeft = false;
     let isResizingRight = false;
+    let hasUnsavedChanges = false; // Track whether there are unsaved changes
     
     // Current date (can be updated by user)
     let currentDate = dayjs('2025-04-19');
@@ -50,6 +54,19 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'gmp', name: 'GMP', shortName: 'GMP', color: '#e74a3b' }, // Red
         { id: 'bidding', name: 'Bidding', shortName: 'BID', color: '#f6c23e' } // Yellow
     ];
+    
+    // Helper function to get current date and time in the required format
+    function getCurrentDateTime() {
+        const now = new Date();
+        const year = now.getUTCFullYear();
+        const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(now.getUTCDate()).padStart(2, '0');
+        const hours = String(now.getUTCHours()).padStart(2, '0');
+        const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+        const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
     
     // Update current date when user changes it
     updateTodayBtn.addEventListener('click', () => {
@@ -147,6 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTimeline() {
         initTimelineDates();
         renderProjects();
+        
+        // Update visual indicator for unsaved changes
+        updateUnsavedChangesIndicator();
     }
     
     // Initialize timeline dates
@@ -542,8 +562,8 @@ document.addEventListener('DOMContentLoaded', () => {
             activeBar.dataset.start = newStartDate;
             activeBar.dataset.end = newEndDate;
             
-            // Save to localStorage
-            saveToLocalStorage();
+            // Mark as having unsaved changes instead of auto-saving
+            markAsUnsaved();
             
             // Check if we need to redraw the timeline
             if (dayjs(newStartDate).isBefore(startDate) || dayjs(newEndDate).isAfter(endDate)) {
@@ -560,6 +580,23 @@ document.addEventListener('DOMContentLoaded', () => {
         isResizingLeft = false;
         isResizingRight = false;
         activeBar = null;
+    }
+    
+    // Mark the document as having unsaved changes
+    function markAsUnsaved() {
+        hasUnsavedChanges = true;
+        updateUnsavedChangesIndicator();
+    }
+    
+    // Update visual indicator for unsaved changes
+    function updateUnsavedChangesIndicator() {
+        if (hasUnsavedChanges) {
+            document.body.classList.add('unsaved-changes');
+            publishDataBtn.classList.add('has-changes');
+        } else {
+            document.body.classList.remove('unsaved-changes');
+            publishDataBtn.classList.remove('has-changes');
+        }
     }
     
     // Show add project modal
@@ -605,7 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Confirm deletion
             if (confirm(`Are you sure you want to delete the project "${projects[editingIndex].name}"?`)) {
                 projects.splice(editingIndex, 1);
-                saveToLocalStorage();
+                markAsUnsaved(); // Mark as having unsaved changes
                 modal.style.display = 'none';
                 
                 // Update timeline
@@ -647,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
             projects.push(projectData);
         }
         
-        saveToLocalStorage();
+        markAsUnsaved(); // Mark as having unsaved changes
         modal.style.display = 'none';
         
         // Update timeline with new project data
@@ -657,33 +694,95 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(zoomToFit, 100);
     }
     
-    // Save to local storage
-    function saveToLocalStorage() {
-        localStorage.setItem('preconstructionProjects', JSON.stringify(projects));
+    // Publish changes to local storage with metadata
+    function publishChanges() {
+        if (!hasUnsavedChanges) {
+            alert('No changes to publish');
+            return;
+        }
+        
+        // Update current timestamp
+        const publishDateTime = getCurrentDateTime();
+        
+        // Create data structure with metadata
+        const saveData = {
+            projects: projects,
+            metadata: {
+                publishedBy: username,
+                publishedAt: publishDateTime
+            }
+        };
+        
+        // Save to localStorage with metadata
+        localStorage.setItem('preconstructionProjects', JSON.stringify(saveData));
+        
+        // Update display of current user and datetime
+        currentUser.textContent = username;
+        currentDateTime.textContent = publishDateTime;
+        
+        // Clear unsaved changes flag
+        hasUnsavedChanges = false;
+        updateUnsavedChangesIndicator();
+        
+        // Show confirmation
+        alert(`Changes published successfully!\nPublished by: ${username}\nDate: ${publishDateTime}`);
     }
     
     // Load from local storage
     function loadFromLocalStorage() {
-        const savedProjects = localStorage.getItem('preconstructionProjects');
-        if (savedProjects) {
-            projects = JSON.parse(savedProjects);
-            renderTimeline();
-            
-            // Create the legend once
-            createLegend();
-            
-            // If we have projects, zoom to fit them
-            if (projects.length > 0) {
-                setTimeout(zoomToFit, 100);
+        const savedData = localStorage.getItem('preconstructionProjects');
+        if (savedData) {
+            try {
+                const parsedData = JSON.parse(savedData);
+                
+                // Handle both old format (just projects array) and new format (with metadata)
+                if (Array.isArray(parsedData)) {
+                    // Old format - just an array of projects
+                    projects = parsedData;
+                } else if (parsedData.projects && Array.isArray(parsedData.projects)) {
+                    // New format with metadata
+                    projects = parsedData.projects;
+                    
+                    // Update user info display if metadata is available
+                    if (parsedData.metadata) {
+                        if (parsedData.metadata.publishedBy) {
+                            currentUser.textContent = parsedData.metadata.publishedBy;
+                        }
+                        if (parsedData.metadata.publishedAt) {
+                            currentDateTime.textContent = parsedData.metadata.publishedAt;
+                        }
+                    }
+                }
+                
+                renderTimeline();
+                
+                // Create the legend once
+                createLegend();
+                
+                // If we have projects, zoom to fit them
+                if (projects.length > 0) {
+                    setTimeout(zoomToFit, 100);
+                }
+            } catch (error) {
+                console.error('Error loading saved data:', error);
+                
+                // Start with empty projects
+                projects = [];
+                renderTimeline();
+                createLegend();
             }
         } else {
             renderTimeline();
             createLegend();
         }
+        
+        // No unsaved changes after loading
+        hasUnsavedChanges = false;
+        updateUnsavedChangesIndicator();
     }
     
-    // Save data to file
-    function saveDataToFile() {
+    // Export data to file
+    function exportDataToFile() {
         const dataStr = JSON.stringify(projects, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(dataBlob);
@@ -705,8 +804,17 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onload = function(e) {
                 try {
                     const loadedProjects = JSON.parse(e.target.result);
-                    projects = loadedProjects;
-                    saveToLocalStorage();
+                    
+                    // Handle both formats - simple array or object with metadata
+                    if (Array.isArray(loadedProjects)) {
+                        projects = loadedProjects;
+                    } else if (loadedProjects.projects && Array.isArray(loadedProjects.projects)) {
+                        projects = loadedProjects.projects;
+                    } else {
+                        throw new Error('Invalid file format');
+                    }
+                    
+                    markAsUnsaved(); // Mark as having unsaved changes after import
                     renderTimeline();
                     
                     // Zoom to fit after loading
@@ -729,7 +837,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Event listeners
     addProjectBtn.addEventListener('click', showAddProjectModal);
-    saveDataBtn.addEventListener('click', saveDataToFile);
+    exportDataBtn.addEventListener('click', exportDataToFile);
+    publishDataBtn.addEventListener('click', publishChanges);
     loadDataBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileUpload);
     projectForm.addEventListener('submit', saveProject);
