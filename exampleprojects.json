@@ -1,0 +1,56 @@
+[
+  {
+    "name": "North Ridgeville",
+    "ddStart": "2025-01-02",
+    "ddEnd": "2025-02-15",
+    "gmpStart": "2025-08-09",
+    "gmpEnd": "2025-09-15",
+    "biddingStart": "2025-12-01",
+    "biddingEnd": "2026-01-02"
+  },
+  {
+    "name": "Oberlin Middle School",
+    "sdStart": "2025-01-30",
+    "sdEnd": "2025-03-24",
+    "ddStart": "2025-06-14",
+    "ddEnd": "2025-08-08",
+    "gmpStart": "2025-12-17",
+    "gmpEnd": "2026-02-11",
+    "biddingStart": "2026-04-01",
+    "biddingEnd": "2026-05-01"
+  },
+  {
+    "name": "Perry Middle School",
+    "sdStart": "2025-07-01",
+    "sdEnd": "2025-08-07",
+    "ddStart": "2025-11-01",
+    "ddEnd": "2025-12-07"
+  },
+  {
+    "name": "Salem Pk-8",
+    "ddStart": "2025-03-04",
+    "ddEnd": "2025-04-11",
+    "gmpStart": "2025-07-07",
+    "gmpEnd": "2025-08-08",
+    "biddingStart": "2025-08-26",
+    "biddingEnd": "2025-09-23"
+  },
+  {
+    "name": "North Canton MS",
+    "ddStart": "2025-01-24",
+    "ddEnd": "2025-03-07",
+    "gmpStart": "2025-06-06",
+    "gmpEnd": "2025-07-21",
+    "biddingStart": "2025-07-22",
+    "biddingEnd": "2025-08-19"
+  },
+  {
+    "name": "Brunswick LFI",
+    "ddStart": "2025-02-10",
+    "ddEnd": "2025-03-25",
+    "gmpStart": "2025-08-11",
+    "gmpEnd": "2025-08-15",
+    "biddingStart": "2025-06-16",
+    "biddingEnd": "2025-07-14"
+  }
+]
