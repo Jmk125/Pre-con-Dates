@@ -183,6 +183,7 @@ button:hover {
     user-select: none;
     z-index: 1;
     touch-action: none; /* Important for dragging to work */
+    box-sizing: border-box; /* Include border in width/height */
 }
 
 .activity-bar.sd {
@@ -351,6 +352,33 @@ input[type="date"] {
     width: calc(50% - 80px);
 }
 
+/* Current date input styling */
+.current-date-display {
+    margin: 10px auto;
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.current-date-display input[type="date"] {
+    width: auto;
+    padding: 4px 8px;
+}
+
+#update-today {
+    font-size: 12px;
+    padding: 5px 10px;
+    background-color: #1cc88a;
+}
+
+#update-today:hover {
+    background-color: #169e6c;
+}
+
 /* Checkbox styling */
 .checkbox-group input[type="checkbox"] {
     width: auto;
@@ -435,14 +463,6 @@ input[type="date"] {
     background-color: #888;
     opacity: 0.6;
     border: 1px dashed rgba(0, 0, 0, 0.3);
-}
-
-/* Current date display */
-.current-date-display {
-    margin: 10px auto;
-    text-align: center;
-    font-size: 14px;
-    color: #666;
 }
 
 /* Empty state message */
