@@ -15,17 +15,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const zoomFitBtn = document.getElementById('zoom-fit');
     const zoomLevelDisplay = document.getElementById('zoom-level');
     const legendContainer = document.getElementById('legend-container');
-    const currentDateDisplay = document.getElementById('current-date-value');
+    const currentDateInput = document.getElementById('current-date-input');
+    const updateTodayBtn = document.getElementById('update-today');
     const deleteProjectBtn = document.getElementById('delete-project');
     const currentUser = document.getElementById('current-user');
     const currentDateTime = document.getElementById('current-datetime');
     const projectPotentialCheckbox = document.getElementById('project-potential');
     const tooltip = document.getElementById('tooltip');
     
-    // Initialize user info and date display with exact format
+    // Initialize user info and date display
     currentUser.textContent = 'Jmk125';
-    currentDateTime.textContent = '2025-04-18 22:18:18';
-    currentDateDisplay.textContent = '2025-04-18';
+    currentDateTime.textContent = '2025-04-19 04:57:59';
     
     // App state
     let projects = [];
@@ -39,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let isResizingLeft = false;
     let isResizingRight = false;
     
+    // Current date (can be updated by user)
+    let currentDate = dayjs('2025-04-19');
+    currentDateInput.value = currentDate.format('YYYY-MM-DD');
+    
     // Activity types with shorter display labels
     const activityTypes = [
         { id: 'sd', name: 'Schematic Design', shortName: 'SD', color: '#1cc88a' }, // Green
@@ -46,16 +50,24 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'gmp', name: 'GMP', shortName: 'GMP', color: '#e74a3b' }, // Red
         { id: 'bidding', name: 'Bidding', shortName: 'BID', color: '#f6c23e' } // Yellow
     ];
-
-    // Current date for reference
-    const currentDate = dayjs('2025-04-18');
+    
+    // Update current date when user changes it
+    updateTodayBtn.addEventListener('click', () => {
+        const newDate = dayjs(currentDateInput.value);
+        if (newDate.isValid()) {
+            currentDate = newDate;
+            renderTimeline();
+        } else {
+            alert('Please enter a valid date in the format YYYY-MM-DD');
+        }
+    });
     
     // Calculate date range based on all projects
     function calculateDateRange() {
         if (projects.length === 0) {
             // Default date range if no projects exist
-            startDate = dayjs('2025-03-01'); // Exactly March 1, 2025
-            endDate = dayjs('2026-04-30'); // Exactly April 30, 2026
+            startDate = currentDate.subtract(1, 'month').startOf('month');
+            endDate = currentDate.add(12, 'month').endOf('month');
             return;
         }
         
@@ -65,14 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
         projects.forEach(project => {
             activityTypes.forEach(type => {
                 if (project[`${type.id}Start`]) {
-                    const date = dayjs(project[`${type.id}Start`]);
+                    const date = dayjs(project[`${type.id}Start`]).startOf('day');
                     if (!earliestDate || date.isBefore(earliestDate)) {
                         earliestDate = date;
                     }
                 }
                 
                 if (project[`${type.id}End`]) {
-                    const date = dayjs(project[`${type.id}End`]);
+                    const date = dayjs(project[`${type.id}End`]).startOf('day');
                     if (!latestDate || date.isAfter(latestDate)) {
                         latestDate = date;
                     }
@@ -81,9 +93,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         if (earliestDate && latestDate) {
-            // Add buffer space before and after (exactly one month)
-            startDate = earliestDate.subtract(1, 'month').date(1); // First day of previous month
-            endDate = latestDate.add(1, 'month').endOf('month'); // Last day of next month
+            // Add buffer space before and after
+            startDate = earliestDate.subtract(1, 'month').startOf('month');
+            endDate = latestDate.add(1, 'month').endOf('month');
             
             // Ensure a minimum timeline span of 6 months
             if (endDate.diff(startDate, 'month') < 6) {
@@ -91,8 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             // Fallback to default
-            startDate = dayjs('2025-03-01'); // Exactly March 1, 2025
-            endDate = dayjs('2026-04-30'); // Exactly April 30, 2026
+            startDate = currentDate.subtract(1, 'month').startOf('month');
+            endDate = currentDate.add(12, 'month').endOf('month');
         }
     }
     
@@ -100,7 +112,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateZoom(newZoomLevel) {
         // Limit zoom between 20% and 400%
         zoomLevel = Math.max(20, Math.min(400, newZoomLevel));
-        pixelsPerDay = (4 * zoomLevel) / 100;
+        pixelsPerDay = Math.floor((4 * zoomLevel) / 100);
+        
+        // Ensure minimum 1 pixel per day
+        if (pixelsPerDay < 1) pixelsPerDay = 1;
+        
         zoomLevelDisplay.textContent = `${zoomLevel}%`;
         
         // Redraw the timeline with new zoom
@@ -115,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const containerWidth = document.querySelector('.timeline-dates-wrapper').clientWidth;
         
         // Calculate the total days in the timeline
-        const totalDays = endDate.diff(startDate, 'day') + 1; // +1 to include the end day
+        const totalDays = endDate.diff(startDate, 'day') + 1; // Include end day
         
         // Calculate the ideal pixels per day to fit everything
         const idealPixelsPerDay = containerWidth / totalDays;
@@ -133,13 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderProjects();
     }
     
-    // Calculate days since start date - core positioning function
-    function daysSinceStart(date) {
-        const targetDay = dayjs(date).startOf('day');
-        const startDay = startDate.startOf('day');
-        return targetDay.diff(startDay, 'day');
-    }
-    
     // Initialize timeline dates
     function initTimelineDates() {
         timelineDates.innerHTML = '';
@@ -152,10 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Generate month markers
         let currentMonth = startDate.clone().startOf('month');
+        const timelineStartDay = startDate.startOf('day');
         
         while (currentMonth.isBefore(endDate) || currentMonth.isSame(endDate, 'month')) {
-            // Calculate position based on days since start
-            const days = daysSinceStart(currentMonth);
+            // Calculate position for this month marker
+            const days = currentMonth.diff(timelineStartDay, 'day');
             const position = days * pixelsPerDay;
             
             const monthMarker = document.createElement('div');
@@ -175,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Add today marker
-        const todayDays = daysSinceStart(currentDate);
+        const todayDays = currentDate.diff(timelineStartDay, 'day');
         const todayPosition = todayDays * pixelsPerDay;
         
         const todayMarker = document.createElement('div');
@@ -199,13 +209,22 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Calculate position from date
     function getPositionFromDate(date) {
-        const days = daysSinceStart(date);
+        const timelineStartDay = startDate.startOf('day');
+        const targetDay = dayjs(date).startOf('day');
+        
+        // Calculate exact days from start
+        const days = targetDay.diff(timelineStartDay, 'day');
+        
+        // Return precise position
         return days * pixelsPerDay;
     }
     
     // Calculate date from position
     function getDateFromPosition(position) {
+        // Calculate days from position
         const days = Math.round(position / pixelsPerDay);
+        
+        // Calculate exact date
         return startDate.clone().add(days, 'day').format('YYYY-MM-DD');
     }
     
@@ -244,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         legendContainer.appendChild(potentialLegendItem);
     }
     
-    // Render projects
+    // Render projects with correct bar positioning
     function renderProjects() {
         projectsContainer.innerHTML = '';
         
@@ -284,22 +303,23 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add activities
             activityTypes.forEach(type => {
                 if (project[`${type.id}Start`] && project[`${type.id}End`]) {
-                    // Get the exact dates from the project data
+                    // Get date strings from the project
                     const startDateStr = project[`${type.id}Start`];
                     const endDateStr = project[`${type.id}End`];
                     
-                    // Get the positions using the consistent days-based positioning
-                    const startPosition = getPositionFromDate(startDateStr);
-                    const endPosition = getPositionFromDate(endDateStr);
+                    // Get date objects for calculations
+                    const startDate = dayjs(startDateStr).startOf('day');
+                    const endDate = dayjs(endDateStr).startOf('day');
                     
-                    // Calculate the width based on the difference in position
-                    // Add pixelsPerDay to include the end date (inclusive range)
-                    let width = (endPosition - startPosition) + pixelsPerDay;
+                    // Calculate positions using our consistent function
+                    const startPosition = getPositionFromDate(startDate);
                     
-                    // Ensure minimum width
-                    if (width < 20) {
-                        width = 20;
-                    }
+                    // Calculate width based on inclusive date range (include end date)
+                    const daysDiff = endDate.diff(startDate, 'day');
+                    const width = (daysDiff + 1) * pixelsPerDay;
+                    
+                    // Minimum visual width
+                    const minWidth = Math.max(20, pixelsPerDay);
                     
                     const activityBar = document.createElement('div');
                     activityBar.className = `activity-bar ${type.id}`;
@@ -308,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     activityBar.dataset.start = startDateStr;
                     activityBar.dataset.end = endDateStr;
                     activityBar.style.left = `${startPosition}px`;
-                    activityBar.style.width = `${width}px`;
+                    activityBar.style.width = `${Math.max(width, minWidth)}px`;
                     
                     const activityLabel = document.createElement('div');
                     activityLabel.className = 'activity-label';
@@ -361,8 +381,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const left = parseInt(bar.style.left) || 0;
         const width = parseInt(bar.style.width) || 0;
         
+        // For tooltips, get start date from left position
         const startDate = getDateFromPosition(left);
-        const endDate = getDateFromPosition(left + width - pixelsPerDay); // Subtract pixelsPerDay to get proper end date
+        
+        // For end date, calculate from the right edge minus one pixel
+        // This ensures we're showing the actual end date, not the next day
+        const endDate = getDateFromPosition(left + width - 1);
         
         // Update tooltip content
         tooltip.innerHTML = `
@@ -370,10 +394,6 @@ document.addEventListener('DOMContentLoaded', () => {
             Start: ${formatDate(startDate)}<br>
             End: ${formatDate(endDate)}
         `;
-        
-        // Store current dates in dataset for reference
-        bar.dataset.currentStart = startDate;
-        bar.dataset.currentEnd = endDate;
     }
     
     // Move tooltip with mouse - position above cursor
@@ -440,6 +460,10 @@ document.addEventListener('DOMContentLoaded', () => {
         activeBar.dataset.initialLeft = parseInt(activeBar.style.left) || 0;
         activeBar.dataset.initialWidth = parseInt(activeBar.style.width) || rect.width;
         
+        // Store original dates
+        activeBar.dataset.originalStart = activeBar.dataset.start;
+        activeBar.dataset.originalEnd = activeBar.dataset.end;
+        
         // Show tooltip immediately
         updateTooltipContent(activeBar);
         tooltip.style.display = 'block';
@@ -468,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const newWidth = initialWidth - dx;
             
             // Ensure minimum width
-            if (newWidth >= 20) {
+            if (newWidth >= pixelsPerDay) {
                 activeBar.style.left = newLeft + 'px';
                 activeBar.style.width = newWidth + 'px';
             }
@@ -477,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const newWidth = initialWidth + dx;
             
             // Ensure minimum width
-            if (newWidth >= 20) {
+            if (newWidth >= pixelsPerDay) {
                 activeBar.style.width = newWidth + 'px';
             }
         }
@@ -503,9 +527,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const left = parseInt(activeBar.style.left);
             const width = parseInt(activeBar.style.width);
             
-            // Get the new dates from the position
+            // Get the exact new dates based on position
             const newStartDate = getDateFromPosition(left);
-            const newEndDate = getDateFromPosition(left + width - pixelsPerDay); // Subtract pixelsPerDay to get proper end date
+            
+            // Calculate the end date from right edge minus 1 pixel
+            // This gives us the actual end date, not the day after
+            const newEndDate = getDateFromPosition(left + width - 1);
             
             // Update project data
             projects[projectIndex][`${activityType}Start`] = newStartDate;
