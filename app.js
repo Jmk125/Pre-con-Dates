@@ -24,10 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const projectPotentialCheckbox = document.getElementById('project-potential');
     const tooltip = document.getElementById('tooltip');
     
-    // Initialize user info and date display
-    const username = 'Jmk125';
-    const currentTimeFormatted = '2025-04-21 20:12:39'; // Using the provided timestamp
-    currentUser.textContent = username;
+    // Initialize datetime display (username will be set on publish or load)
+    const currentTimeFormatted = '2025-04-21 20:21:44'; // Using the updated timestamp
     currentDateTime.textContent = currentTimeFormatted;
     
     // App state
@@ -708,12 +706,34 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(zoomToFit, 100);
     }
     
+    // Prompt for user initials before publishing
+    function promptForInitials() {
+        let userInitials = prompt("Enter your initials for publishing:");
+        
+        // Validate input
+        if (!userInitials) {
+            alert("Initials are required to publish changes.");
+            return null;
+        }
+        
+        // Limit length if needed (optional)
+        if (userInitials.length > 10) {
+            userInitials = userInitials.substring(0, 10);
+        }
+        
+        return userInitials;
+    }
+    
     // Publish changes to local storage with metadata
     function publishChanges() {
         if (!hasUnsavedChanges) {
             alert('No changes to publish');
             return;
         }
+        
+        // Prompt for user initials
+        const userInitials = promptForInitials();
+        if (!userInitials) return; // Exit if no initials provided
         
         // Update current timestamp
         const publishDateTime = getCurrentDateTime();
@@ -722,7 +742,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const saveData = {
             projects: projects,
             metadata: {
-                publishedBy: username,
+                publishedBy: userInitials,
                 publishedAt: publishDateTime
             }
         };
@@ -731,7 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('preconstructionProjects', JSON.stringify(saveData));
         
         // Update display of current user and datetime in the UI
-        currentUser.textContent = username;
+        currentUser.textContent = userInitials;
         currentDateTime.textContent = publishDateTime;
         
         // Add visual indication of who published and when
@@ -748,7 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUnsavedChangesIndicator();
         
         // Show confirmation
-        alert(`Changes published successfully!\nPublished by: ${username}\nDate: ${publishDateTime}`);
+        alert(`Changes published successfully!\nPublished by: ${userInitials}\nDate: ${publishDateTime}`);
     }
     
     // Load from local storage
