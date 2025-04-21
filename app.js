@@ -25,8 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const tooltip = document.getElementById('tooltip');
     
     // Initialize datetime display (username will be set on publish or load)
-    const currentTimeFormatted = '2025-04-21 20:21:44'; // Using the updated timestamp
+    const currentTimeFormatted = '2025-04-21 20:42:52'; // Using the updated timestamp
     currentDateTime.textContent = currentTimeFormatted;
+    currentUser.textContent = 'Jmk125'; // Using the provided login
     
     // App state
     let projects = [];
@@ -138,37 +139,49 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTimeline();
     }
     
-    // Zoom to fit all activities - FIXED to properly fill the screen width
+    // Improved Zoom to fit all activities - Fix to completely fill the screen width
     function zoomToFit() {
         if (projects.length === 0) return;
         
-        // Calculate the container width, accounting for the project name width
-        const timelineContainer = document.querySelector('.timeline-dates-wrapper');
-        const containerWidth = timelineContainer.clientWidth;
+        // Get the timeline container width
+        const timelineWrapper = document.querySelector('.timeline-dates-wrapper');
+        const availableWidth = timelineWrapper.clientWidth;
         
         // Calculate the total days in the timeline
-        const totalDays = endDate.diff(startDate, 'day') + 1; // Include end day
+        const totalDays = endDate.diff(startDate, 'day') + 1;
         
-        // Calculate the ideal pixels per day to fill exactly the container width
-        const idealPixelsPerDay = containerWidth / totalDays;
+        // Calculate the ideal pixels per day to fill the container
+        // Use a scale factor of 1.02 (102%) to ensure we use slightly more space
+        const scaleFactor = 1.02;
+        const idealPixelsPerDay = (availableWidth / totalDays) * scaleFactor;
         
         // Calculate the zoom level that would give us this pixels per day
-        const idealZoomLevel = Math.floor((idealPixelsPerDay * 100) / 4);
+        const idealZoomLevel = Math.ceil((idealPixelsPerDay * 100) / 4);
         
-        // Apply zoom - use exact calculation to fill the width
+        // Apply the calculated zoom
         updateZoom(idealZoomLevel);
         
-        // Force a re-render to ensure everything is properly sized
+        // Force immediate updates to ensure proper sizing
+        const timelineDateDisplay = document.getElementById('timeline-dates');
+        const projectTimelines = document.querySelectorAll('.project-timeline');
+        
+        // Use a more aggressive approach to ensure the timeline fills the width
+        // Set width explicitly based on calculated ideal width
+        const totalCalculatedWidth = totalDays * pixelsPerDay;
+        
+        // First pass: set all widths to match the calculated width
+        timelineDateDisplay.style.width = `${totalCalculatedWidth}px`;
+        projectTimelines.forEach(timeline => {
+            timeline.style.width = `${totalCalculatedWidth}px`;
+        });
+        
+        // Second pass after a short delay: check and adjust if needed
         setTimeout(() => {
-            // Set the timeline width explicitly to match container
-            const timelineDateDisplay = document.getElementById('timeline-dates');
-            timelineDateDisplay.style.width = `${containerWidth}px`;
-            
-            // Update all project timelines to match
-            const projectTimelines = document.querySelectorAll('.project-timeline');
-            projectTimelines.forEach(timeline => {
-                timeline.style.width = `${containerWidth}px`;
-            });
+            // If timeline is still smaller than container, increase the zoom further
+            if (totalCalculatedWidth < availableWidth && zoomLevel < 400) {
+                const adjustedZoom = Math.min(400, zoomLevel + 10);
+                updateZoom(adjustedZoom);
+            }
         }, 50);
     }
     
