@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize user info and date display
     const username = 'Jmk125';
-    const currentTimeFormatted = getCurrentDateTime();
+    const currentTimeFormatted = '2025-04-21 20:12:39'; // Using the provided timestamp
     currentUser.textContent = username;
     currentDateTime.textContent = currentTimeFormatted;
     
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let hasUnsavedChanges = false; // Track whether there are unsaved changes
     
     // Current date (can be updated by user)
-    let currentDate = dayjs('2025-04-19');
+    let currentDate = dayjs('2025-04-21');
     currentDateInput.value = currentDate.format('YYYY-MM-DD');
     
     // Activity types with shorter display labels
@@ -140,24 +140,38 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTimeline();
     }
     
-    // Zoom to fit all activities
+    // Zoom to fit all activities - FIXED to properly fill the screen width
     function zoomToFit() {
         if (projects.length === 0) return;
         
-        // Calculate the container width
-        const containerWidth = document.querySelector('.timeline-dates-wrapper').clientWidth;
+        // Calculate the container width, accounting for the project name width
+        const timelineContainer = document.querySelector('.timeline-dates-wrapper');
+        const containerWidth = timelineContainer.clientWidth;
         
         // Calculate the total days in the timeline
         const totalDays = endDate.diff(startDate, 'day') + 1; // Include end day
         
-        // Calculate the ideal pixels per day to fit everything
+        // Calculate the ideal pixels per day to fill exactly the container width
         const idealPixelsPerDay = containerWidth / totalDays;
         
         // Calculate the zoom level that would give us this pixels per day
         const idealZoomLevel = Math.floor((idealPixelsPerDay * 100) / 4);
         
-        // Update zoom (with some buffer space)
-        updateZoom(Math.max(20, idealZoomLevel * 0.95));
+        // Apply zoom - use exact calculation to fill the width
+        updateZoom(idealZoomLevel);
+        
+        // Force a re-render to ensure everything is properly sized
+        setTimeout(() => {
+            // Set the timeline width explicitly to match container
+            const timelineDateDisplay = document.getElementById('timeline-dates');
+            timelineDateDisplay.style.width = `${containerWidth}px`;
+            
+            // Update all project timelines to match
+            const projectTimelines = document.querySelectorAll('.project-timeline');
+            projectTimelines.forEach(timeline => {
+                timeline.style.width = `${containerWidth}px`;
+            });
+        }, 50);
     }
     
     // Render the entire timeline
@@ -716,9 +730,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save to localStorage with metadata
         localStorage.setItem('preconstructionProjects', JSON.stringify(saveData));
         
-        // Update display of current user and datetime
+        // Update display of current user and datetime in the UI
         currentUser.textContent = username;
         currentDateTime.textContent = publishDateTime;
+        
+        // Add visual indication of who published and when
+        const userInfoElement = document.querySelector('.user-info');
+        userInfoElement.classList.add('just-published');
+        
+        // Remove the highlight after 3 seconds
+        setTimeout(() => {
+            userInfoElement.classList.remove('just-published');
+        }, 3000);
         
         // Clear unsaved changes flag
         hasUnsavedChanges = false;
