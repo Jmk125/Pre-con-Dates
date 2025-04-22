@@ -23,9 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentDateTime = document.getElementById('current-datetime');
     const projectPotentialCheckbox = document.getElementById('project-potential');
     const tooltip = document.getElementById('tooltip');
+    const addCustomActivityBtn = document.getElementById('add-custom-activity');
     
     // Initialize datetime display (username will be set on publish or load)
-    const currentTimeFormatted = '2025-04-22 17:07:09'; // Using the provided timestamp
+    const currentTimeFormatted = '2025-04-22 20:56:31'; // Using the provided timestamp
     currentDateTime.textContent = currentTimeFormatted;
     currentUser.textContent = 'Jmk125'; // Using the provided login
     
@@ -43,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let hasUnsavedChanges = false; // Track whether there are unsaved changes
     
     // Current date (can be updated by user)
-    let currentDate = dayjs('2025-04-21');
+    let currentDate = dayjs('2025-04-22');
     currentDateInput.value = currentDate.format('YYYY-MM-DD');
     
     // Activity types with shorter display labels
@@ -53,6 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'gmp', name: 'GMP', shortName: 'GMP', color: '#e74a3b' }, // Red
         { id: 'bidding', name: 'Bidding', shortName: 'BID', color: '#f6c23e' } // Yellow
     ];
+    
+    // Custom activities container div - reference to store custom activities in form
+    let customActivitiesContainer = null;
     
     // Helper function to get current date and time in the required format
     function getCurrentDateTime() {
@@ -65,6 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const seconds = String(now.getUTCSeconds()).padStart(2, '0');
         
         return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+    
+    // Add Custom Activity event listener
+    if (addCustomActivityBtn) {
+        addCustomActivityBtn.addEventListener('click', addCustomActivityToForm);
     }
     
     // Update current date when user changes it
@@ -91,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let latestDate = null;
         
         projects.forEach(project => {
+            // Check standard activities
             activityTypes.forEach(type => {
                 if (project[`${type.id}Start`]) {
                     const date = dayjs(project[`${type.id}Start`]).startOf('day');
@@ -106,6 +116,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
+            
+            // Check custom activities
+            if (project.customActivities && Array.isArray(project.customActivities)) {
+                project.customActivities.forEach(activity => {
+                    if (activity.startDate) {
+                        const date = dayjs(activity.startDate).startOf('day');
+                        if (!earliestDate || date.isBefore(earliestDate)) {
+                            earliestDate = date;
+                        }
+                    }
+                    
+                    if (activity.endDate) {
+                        const date = dayjs(activity.endDate).startOf('day');
+                        if (!latestDate || date.isAfter(latestDate)) {
+                            latestDate = date;
+                        }
+                    }
+                });
+            }
         });
         
         if (earliestDate && latestDate) {
@@ -345,7 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set the width to match the timeline dates
             projectTimeline.style.width = timelineWidth;
             
-            // Add activities
+            // Add standard activities
             activityTypes.forEach(type => {
                 if (project[`${type.id}Start`] && project[`${type.id}End`]) {
                     // Get date strings from the project
@@ -397,6 +426,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
+            // Add custom activities
+            if (project.customActivities && Array.isArray(project.customActivities)) {
+                project.customActivities.forEach((customActivity, customIndex) => {
+                    if (customActivity.startDate && customActivity.endDate && customActivity.name && customActivity.type) {
+                        // Find the activity type to get the color
+                        const activityType = activityTypes.find(type => type.id === customActivity.type);
+                        if (!activityType) return;
+                        
+                        // Get date objects for calculations
+                        const startDate = dayjs(customActivity.startDate).startOf('day');
+                        const endDate = dayjs(customActivity.endDate).startOf('day');
+                        
+                        // Calculate positions
+                        const startPosition = getPositionFromDate(startDate);
+                        
+                        // Calculate width
+                        const daysDiff = endDate.diff(startDate, 'day');
+                        const width = (daysDiff + 1) * pixelsPerDay;
+                        
+                        // Minimum visual width
+                        const minWidth = Math.max(20, pixelsPerDay);
+                        
+                        const activityBar = document.createElement('div');
+                        activityBar.className = `activity-bar ${activityType.id} custom-activity`;
+                        activityBar.dataset.project = index;
+                        activityBar.dataset.customActivity = customIndex;
+                        activityBar.dataset.start = customActivity.startDate;
+                        activityBar.dataset.end = customActivity.endDate;
+                        activityBar.dataset.activityName = customActivity.name;
+                        activityBar.dataset.activityType = customActivity.type;
+                        activityBar.style.left = `${startPosition}px`;
+                        activityBar.style.width = `${Math.max(width, minWidth)}px`;
+                        
+                        const activityLabel = document.createElement('div');
+                        activityLabel.className = 'activity-label';
+                        activityLabel.textContent = customActivity.name; // Use the custom name
+                        
+                        const leftHandle = document.createElement('div');
+                        leftHandle.className = 'resize-handle left';
+                        
+                        const rightHandle = document.createElement('div');
+                        rightHandle.className = 'resize-handle right';
+                        
+                        activityBar.appendChild(leftHandle);
+                        activityBar.appendChild(rightHandle);
+                        activityBar.appendChild(activityLabel);
+                        projectTimeline.appendChild(activityBar);
+                        
+                        // Add tooltip event listeners
+                        activityBar.addEventListener('mouseenter', showTooltip);
+                        activityBar.addEventListener('mousemove', moveTooltip);
+                        activityBar.addEventListener('mouseleave', hideTooltip);
+                    }
+                });
+            }
+            
             projectRow.appendChild(projectName);
             projectRow.appendChild(projectTimeline);
             projectsContainer.appendChild(projectRow);
@@ -418,9 +503,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Update tooltip content based on bar's current position
     function updateTooltipContent(bar) {
-        // Get activity type
-        const activityType = bar.dataset.activity;
-        const activity = activityTypes.find(type => type.id === activityType);
+        // Get activity type and name
+        let activityType, activityName;
+        
+        if (bar.dataset.customActivity !== undefined) {
+            // Custom activity
+            activityType = bar.dataset.activityType;
+            activityName = bar.dataset.activityName;
+        } else {
+            // Standard activity
+            activityType = bar.dataset.activity;
+            const activity = activityTypes.find(type => type.id === activityType);
+            activityName = activity.name;
+        }
         
         // Calculate current dates based on position
         const left = parseInt(bar.style.left) || 0;
@@ -435,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update tooltip content
         tooltip.innerHTML = `
-            <strong>${activity.name}</strong><br>
+            <strong>${activityName}</strong><br>
             Start: ${formatDate(startDate)}<br>
             End: ${formatDate(endDate)}
         `;
@@ -567,7 +662,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isDragging || isResizingLeft || isResizingRight) {
             // Update project data when dragging or resizing ends
             const projectIndex = parseInt(activeBar.dataset.project);
-            const activityType = activeBar.dataset.activity;
             
             const left = parseInt(activeBar.style.left);
             const width = parseInt(activeBar.style.width);
@@ -579,13 +673,25 @@ document.addEventListener('DOMContentLoaded', () => {
             // This gives us the actual end date, not the day after
             const newEndDate = getDateFromPosition(left + width - 1);
             
-            // Update project data
-            projects[projectIndex][`${activityType}Start`] = newStartDate;
-            projects[projectIndex][`${activityType}End`] = newEndDate;
-            
-            // Update the bar's data attributes
-            activeBar.dataset.start = newStartDate;
-            activeBar.dataset.end = newEndDate;
+            if (activeBar.dataset.customActivity !== undefined) {
+                // Update custom activity
+                const customIndex = parseInt(activeBar.dataset.customActivity);
+                projects[projectIndex].customActivities[customIndex].startDate = newStartDate;
+                projects[projectIndex].customActivities[customIndex].endDate = newEndDate;
+                
+                // Update the bar's data attributes
+                activeBar.dataset.start = newStartDate;
+                activeBar.dataset.end = newEndDate;
+            } else {
+                // Update standard activity
+                const activityType = activeBar.dataset.activity;
+                projects[projectIndex][`${activityType}Start`] = newStartDate;
+                projects[projectIndex][`${activityType}End`] = newEndDate;
+                
+                // Update the bar's data attributes
+                activeBar.dataset.start = newStartDate;
+                activeBar.dataset.end = newEndDate;
+            }
             
             // Mark as having unsaved changes instead of auto-saving
             markAsUnsaved();
@@ -624,11 +730,133 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // Add custom activity to form
+    function addCustomActivityToForm() {
+        // Get the container for custom activities
+        const customActivitiesContainer = document.getElementById('custom-activities-container');
+        if (!customActivitiesContainer) return;
+        
+        // Create a unique ID for this custom activity
+        const customId = 'custom-' + Date.now();
+        
+        // Create container for this custom activity
+        const customActivityRow = document.createElement('div');
+        customActivityRow.className = 'custom-activity-row';
+        customActivityRow.dataset.id = customId;
+        
+        // Activity name
+        const nameContainer = document.createElement('div');
+        nameContainer.className = 'form-group custom-activity-name';
+        
+        const nameLabel = document.createElement('label');
+        nameLabel.textContent = 'Activity Name:';
+        
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'form-control custom-name';
+        nameInput.required = true;
+        nameInput.placeholder = 'e.g., Sitework Bid';
+        
+        nameContainer.appendChild(nameLabel);
+        nameContainer.appendChild(nameInput);
+        
+        // Activity type (for color)
+        const typeContainer = document.createElement('div');
+        typeContainer.className = 'form-group custom-activity-type';
+        
+        const typeLabel = document.createElement('label');
+        typeLabel.textContent = 'Activity Type (for color):';
+        
+        const typeSelect = document.createElement('select');
+        typeSelect.className = 'form-control custom-type';
+        typeSelect.required = true;
+        
+        // Add options for each activity type
+        activityTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type.id;
+            option.textContent = type.name;
+            typeSelect.appendChild(option);
+        });
+        
+        typeContainer.appendChild(typeLabel);
+        typeContainer.appendChild(typeSelect);
+        
+        // Date range
+        const dateContainer = document.createElement('div');
+        dateContainer.className = 'date-range-container';
+        
+        // Start date
+        const startContainer = document.createElement('div');
+        startContainer.className = 'form-group start-date';
+        
+        const startLabel = document.createElement('label');
+        startLabel.textContent = 'Start Date:';
+        
+        const startInput = document.createElement('input');
+        startInput.type = 'date';
+        startInput.className = 'form-control custom-start';
+        startInput.required = true;
+        
+        startContainer.appendChild(startLabel);
+        startContainer.appendChild(startInput);
+        
+        // End date
+        const endContainer = document.createElement('div');
+        endContainer.className = 'form-group end-date';
+        
+        const endLabel = document.createElement('label');
+        endLabel.textContent = 'End Date:';
+        
+        const endInput = document.createElement('input');
+        endInput.type = 'date';
+        endInput.className = 'form-control custom-end';
+        endInput.required = true;
+        
+        endContainer.appendChild(endLabel);
+        endContainer.appendChild(endInput);
+        
+        dateContainer.appendChild(startContainer);
+        dateContainer.appendChild(endContainer);
+        
+        // Remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-danger remove-custom-activity';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', function() {
+            customActivityRow.remove();
+        });
+        
+        // Add all elements to the row
+        customActivityRow.appendChild(nameContainer);
+        customActivityRow.appendChild(typeContainer);
+        customActivityRow.appendChild(dateContainer);
+        customActivityRow.appendChild(removeBtn);
+        
+        // Add the row to the container
+        customActivitiesContainer.appendChild(customActivityRow);
+    }
+    
+    // Initialize custom activities section in form
+    function initCustomActivitiesSection() {
+        // Reference the container from the DOM
+        customActivitiesContainer = document.getElementById('custom-activities-container');
+        
+        // Clear existing custom activities when opening a new form
+        if (customActivitiesContainer) {
+            customActivitiesContainer.innerHTML = '';
+        }
+    }
+    
     // Show add project modal
     function showAddProjectModal() {
         modalTitle.textContent = 'Add Project';
         projectForm.reset();
         editingIndex = null;
+        
+        // Initialize custom activities section
+        initCustomActivitiesSection();
         
         // Hide delete button for new projects
         deleteProjectBtn.style.display = 'none';
@@ -644,6 +872,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('project-name').value = project.name;
         document.getElementById('project-potential').checked = project.potential || false;
         
+        // Initialize custom activities section
+        initCustomActivitiesSection();
+        
+        // Fill in standard activities
         activityTypes.forEach(type => {
             if (project[`${type.id}Start`]) {
                 document.getElementById(`${type.id}-start`).value = project[`${type.id}Start`];
@@ -652,6 +884,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById(`${type.id}-end`).value = project[`${type.id}End`];
             }
         });
+        
+        // Fill in custom activities if they exist
+        if (project.customActivities && Array.isArray(project.customActivities)) {
+            project.customActivities.forEach(customActivity => {
+                // Create a new custom activity row
+                addCustomActivityToForm();
+                
+                // Get the row we just added (last one in container)
+                const rows = customActivitiesContainer.querySelectorAll('.custom-activity-row');
+                const lastRow = rows[rows.length - 1];
+                
+                // Fill in values
+                lastRow.querySelector('.custom-name').value = customActivity.name;
+                lastRow.querySelector('.custom-type').value = customActivity.type;
+                lastRow.querySelector('.custom-start').value = customActivity.startDate;
+                lastRow.querySelector('.custom-end').value = customActivity.endDate;
+            });
+        }
         
         editingIndex = index;
         
@@ -690,6 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
             potential: document.getElementById('project-potential').checked
         };
         
+        // Save standard activities
         activityTypes.forEach(type => {
             const startValue = document.getElementById(`${type.id}-start`).value;
             const endValue = document.getElementById(`${type.id}-end`).value;
@@ -700,6 +951,27 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (endValue) {
                 projectData[`${type.id}End`] = endValue;
+            }
+        });
+        
+        // Save custom activities
+        projectData.customActivities = [];
+        
+        // Get all custom activity rows
+        const customRows = document.getElementById('custom-activities-container').querySelectorAll('.custom-activity-row');
+        customRows.forEach(row => {
+            const name = row.querySelector('.custom-name').value;
+            const type = row.querySelector('.custom-type').value;
+            const startDate = row.querySelector('.custom-start').value;
+            const endDate = row.querySelector('.custom-end').value;
+            
+            if (name && type && startDate && endDate) {
+                projectData.customActivities.push({
+                    name: name,
+                    type: type,
+                    startDate: startDate,
+                    endDate: endDate
+                });
             }
         });
         
