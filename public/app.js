@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let hasUnsavedChanges = false; // Track whether there are unsaved changes
     
     // Current date (can be updated by user)
-    let currentDate = dayjs('2025-04-22');
+    let currentDate = dayjs();
     currentDateInput.value = currentDate.format('YYYY-MM-DD');
     
     // Activity types with shorter display labels
