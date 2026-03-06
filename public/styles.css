@@ -156,12 +156,23 @@ button:hover {
 .project-name {
     width: var(--project-name-width);
     padding: 15px 10px;
-    font-weight: bold;
+    font-weight: 600;
+    color: #2f4fb8;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     background-color: #f8f9fc;
     border-right: 1px solid #ddd;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.project-name:hover {
+    background-color: #eef3ff;
+    color: #2343a6;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
 }
 
 /* Potential project styling */
