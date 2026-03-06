@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Current date (can be updated by user)
     let currentDate = dayjs();
     let pastWindowMonths = 6;
-    let futureBufferMonths = 4;
+    let futureBufferMonths = 3;
     currentDateInput.value = currentDate.format('YYYY-MM-DD');
     pastWindowMonthsInput.value = pastWindowMonths;
     futureBufferMonthsInput.value = futureBufferMonths;
