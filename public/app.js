@@ -408,6 +408,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (project.potential) {
                 projectRow.classList.add('potential');
             }
+
+            const hasBelowCustomActivity = Array.isArray(project.customActivities)
+                && project.customActivities.some(customActivity => customActivity && customActivity.showBelow === true);
+
+            if (hasBelowCustomActivity) {
+                projectRow.classList.add('has-below-row');
+            }
             
             // Add project name
             const projectName = document.createElement('div');
@@ -450,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     activityBar.dataset.end = endDateStr;
                     activityBar.style.left = `${startPosition}px`;
                     activityBar.style.width = `${Math.max(width, minWidth)}px`;
+                    activityBar.style.top = '10px';
                     
                     const activityLabel = document.createElement('div');
                     activityLabel.className = 'activity-label';
@@ -480,21 +488,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Find the activity type to get the color
                         const activityType = activityTypes.find(type => type.id === customActivity.type);
                         if (!activityType) return;
-                        
+
                         // Get date objects for calculations
                         const startDate = dayjs(customActivity.startDate).startOf('day');
                         const endDate = dayjs(customActivity.endDate).startOf('day');
-                        
+
                         // Calculate positions
                         const startPosition = getPositionFromDate(startDate);
-                        
+
                         // Calculate width
                         const daysDiff = endDate.diff(startDate, 'day');
                         const width = (daysDiff + 1) * pixelsPerDay;
-                        
+
                         // Minimum visual width
                         const minWidth = Math.max(20, pixelsPerDay);
-                        
+
                         const activityBar = document.createElement('div');
                         activityBar.className = `activity-bar ${activityType.id} custom-activity`;
                         activityBar.dataset.project = index;
@@ -505,22 +513,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         activityBar.dataset.activityType = customActivity.type;
                         activityBar.style.left = `${startPosition}px`;
                         activityBar.style.width = `${Math.max(width, minWidth)}px`;
-                        
+                        activityBar.style.top = customActivity.showBelow ? '50px' : '10px';
+
                         const activityLabel = document.createElement('div');
                         activityLabel.className = 'activity-label';
                         activityLabel.textContent = customActivity.name; // Use the custom name
-                        
+
                         const leftHandle = document.createElement('div');
                         leftHandle.className = 'resize-handle left';
-                        
+
                         const rightHandle = document.createElement('div');
                         rightHandle.className = 'resize-handle right';
-                        
+
                         activityBar.appendChild(leftHandle);
                         activityBar.appendChild(rightHandle);
                         activityBar.appendChild(activityLabel);
                         projectTimeline.appendChild(activityBar);
-                        
+
                         // Add tooltip event listeners
                         activityBar.addEventListener('mouseenter', showTooltip);
                         activityBar.addEventListener('mousemove', moveTooltip);
@@ -865,6 +874,24 @@ document.addEventListener('DOMContentLoaded', () => {
         
         dateContainer.appendChild(startContainer);
         dateContainer.appendChild(endContainer);
+
+        // Optional below-lane toggle
+        const belowContainer = document.createElement('div');
+        belowContainer.className = 'form-group custom-below-option';
+
+        const belowLabel = document.createElement('label');
+        belowLabel.className = 'custom-below-label';
+
+        const belowInput = document.createElement('input');
+        belowInput.type = 'checkbox';
+        belowInput.className = 'custom-show-below';
+
+        const belowLabelText = document.createElement('span');
+        belowLabelText.textContent = 'Below (show on second activity lane)';
+
+        belowLabel.appendChild(belowInput);
+        belowLabel.appendChild(belowLabelText);
+        belowContainer.appendChild(belowLabel);
         
         // Remove button
         const removeBtn = document.createElement('button');
@@ -879,6 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
         customActivityRow.appendChild(nameContainer);
         customActivityRow.appendChild(typeContainer);
         customActivityRow.appendChild(dateContainer);
+        customActivityRow.appendChild(belowContainer);
         customActivityRow.appendChild(removeBtn);
         
         // Add the row to the container
@@ -947,6 +975,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastRow.querySelector('.custom-type').value = customActivity.type;
                 lastRow.querySelector('.custom-start').value = customActivity.startDate;
                 lastRow.querySelector('.custom-end').value = customActivity.endDate;
+                lastRow.querySelector('.custom-show-below').checked = customActivity.showBelow === true;
             });
         }
         
@@ -1011,13 +1040,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = row.querySelector('.custom-type').value;
             const startDate = row.querySelector('.custom-start').value;
             const endDate = row.querySelector('.custom-end').value;
+            const showBelow = row.querySelector('.custom-show-below').checked;
             
             if (name && type && startDate && endDate) {
                 projectData.customActivities.push({
                     name: name,
                     type: type,
                     startDate: startDate,
-                    endDate: endDate
+                    endDate: endDate,
+                    showBelow: showBelow
                 });
             }
         });
