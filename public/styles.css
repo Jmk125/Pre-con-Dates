@@ -369,6 +369,23 @@ input[type="date"] {
     padding: 4px 8px;
 }
 
+.current-date-display input[type="number"] {
+    width: 75px;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#apply-time-window {
+    font-size: 12px;
+    padding: 5px 10px;
+    background-color: #4e73df;
+}
+
+#apply-time-window:hover {
+    background-color: #2e59d9;
+}
+
 #update-today {
     font-size: 12px;
     padding: 5px 10px;
