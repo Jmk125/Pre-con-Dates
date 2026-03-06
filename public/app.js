@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Current date (can be updated by user)
     let currentDate = dayjs();
+    const realToday = dayjs().startOf('day');
     let pastWindowMonths = 6;
     let futureBufferMonths = 3;
     currentDateInput.value = currentDate.format('YYYY-MM-DD');
@@ -288,8 +289,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentMonth = currentMonth.add(1, 'month');
         }
         
-        // Add today marker
-        const todayDays = currentDate.diff(timelineStartDay, 'day');
+        // Add today marker (fixed to the real date so it moves as the window shifts)
+        const todayDays = realToday.diff(timelineStartDay, 'day');
         const todayPosition = todayDays * pixelsPerDay;
         
         const todayMarker = document.createElement('div');
