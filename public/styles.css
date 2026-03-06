@@ -149,6 +149,10 @@ button:hover {
     width: 100%;
 }
 
+.project-row.has-below-row {
+    height: 90px;
+}
+
 .project-name {
     width: var(--project-name-width);
     padding: 15px 10px;
@@ -367,6 +371,23 @@ input[type="date"] {
 .current-date-display input[type="date"] {
     width: auto;
     padding: 4px 8px;
+}
+
+.current-date-display input[type="number"] {
+    width: 75px;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#apply-time-window {
+    font-size: 12px;
+    padding: 5px 10px;
+    background-color: #4e73df;
+}
+
+#apply-time-window:hover {
+    background-color: #2e59d9;
 }
 
 #update-today {
@@ -590,6 +611,24 @@ input[type="date"] {
 
 .start-date {
     margin-right: 10px;
+}
+
+.custom-below-option {
+    flex: 1 1 100%;
+    margin-top: 5px;
+}
+
+.custom-below-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: auto;
+    font-size: 0.9rem;
+}
+
+.custom-below-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
 }
 
 .remove-custom-activity {

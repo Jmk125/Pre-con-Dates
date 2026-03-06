@@ -18,6 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const legendContainer = document.getElementById('legend-container');
     const currentDateInput = document.getElementById('current-date-input');
     const updateTodayBtn = document.getElementById('update-today');
+    const pastWindowMonthsInput = document.getElementById('past-window-months');
+    const futureBufferMonthsInput = document.getElementById('future-buffer-months');
+    const applyTimeWindowBtn = document.getElementById('apply-time-window');
     const deleteProjectBtn = document.getElementById('delete-project');
     const currentUser = document.getElementById('current-user');
     const currentDateTime = document.getElementById('current-datetime');
@@ -45,7 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Current date (can be updated by user)
     let currentDate = dayjs();
+    let pastWindowMonths = 6;
+    let futureBufferMonths = 4;
     currentDateInput.value = currentDate.format('YYYY-MM-DD');
+    pastWindowMonthsInput.value = pastWindowMonths;
+    futureBufferMonthsInput.value = futureBufferMonths;
     
     // Activity types with shorter display labels
     const activityTypes = [
@@ -86,29 +93,40 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please enter a valid date in the format YYYY-MM-DD');
         }
     });
+
+    function parseWindowMonths(value, fallback, min) {
+        const parsed = Number.parseInt(value, 10);
+        if (Number.isNaN(parsed) || parsed < min) {
+            return fallback;
+        }
+        return parsed;
+    }
+
+    applyTimeWindowBtn.addEventListener('click', () => {
+        pastWindowMonths = parseWindowMonths(pastWindowMonthsInput.value, pastWindowMonths, 0);
+        futureBufferMonths = parseWindowMonths(futureBufferMonthsInput.value, futureBufferMonths, 1);
+
+        pastWindowMonthsInput.value = pastWindowMonths;
+        futureBufferMonthsInput.value = futureBufferMonths;
+
+        renderTimeline();
+    });
     
     // Calculate date range based on all projects
     function calculateDateRange() {
+        const windowStart = currentDate.subtract(pastWindowMonths, 'month').startOf('month');
+
         if (projects.length === 0) {
-            // Default date range if no projects exist
-            startDate = currentDate.subtract(1, 'month').startOf('month');
-            endDate = currentDate.add(12, 'month').endOf('month');
+            startDate = windowStart;
+            endDate = currentDate.add(futureBufferMonths, 'month').endOf('month');
             return;
         }
-        
-        let earliestDate = null;
+
         let latestDate = null;
-        
+
         projects.forEach(project => {
             // Check standard activities
             activityTypes.forEach(type => {
-                if (project[`${type.id}Start`]) {
-                    const date = dayjs(project[`${type.id}Start`]).startOf('day');
-                    if (!earliestDate || date.isBefore(earliestDate)) {
-                        earliestDate = date;
-                    }
-                }
-                
                 if (project[`${type.id}End`]) {
                     const date = dayjs(project[`${type.id}End`]).startOf('day');
                     if (!latestDate || date.isAfter(latestDate)) {
@@ -116,17 +134,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
-            
+
             // Check custom activities
             if (project.customActivities && Array.isArray(project.customActivities)) {
                 project.customActivities.forEach(activity => {
-                    if (activity.startDate) {
-                        const date = dayjs(activity.startDate).startOf('day');
-                        if (!earliestDate || date.isBefore(earliestDate)) {
-                            earliestDate = date;
-                        }
-                    }
-                    
                     if (activity.endDate) {
                         const date = dayjs(activity.endDate).startOf('day');
                         if (!latestDate || date.isAfter(latestDate)) {
@@ -136,23 +147,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         });
-        
-        if (earliestDate && latestDate) {
-            // Add buffer space before and after
-            startDate = earliestDate.subtract(1, 'month').startOf('month');
-            endDate = latestDate.add(1, 'month').endOf('month');
-            
-            // Ensure a minimum timeline span of 6 months
-            if (endDate.diff(startDate, 'month') < 6) {
-                endDate = startDate.add(6, 'month').endOf('month');
-            }
-        } else {
-            // Fallback to default
-            startDate = currentDate.subtract(1, 'month').startOf('month');
-            endDate = currentDate.add(12, 'month').endOf('month');
+
+        startDate = windowStart;
+
+        const baseEndDate = latestDate && latestDate.isAfter(currentDate)
+            ? latestDate
+            : currentDate.startOf('day');
+
+        endDate = baseEndDate.add(futureBufferMonths, 'month').endOf('month');
+
+        // Ensure a minimum timeline span of 6 months
+        if (endDate.diff(startDate, 'month') < 6) {
+            endDate = startDate.add(6, 'month').endOf('month');
         }
     }
-    
+
+    function hasVisibleProjectActivity(project) {
+        const timelineStart = startDate.startOf('day');
+        const timelineEnd = endDate.endOf('day');
+
+        const overlapsTimeline = (activityStart, activityEnd) => {
+            const start = dayjs(activityStart).startOf('day');
+            const end = dayjs(activityEnd).startOf('day');
+            return !end.isBefore(timelineStart) && !start.isAfter(timelineEnd);
+        };
+
+        for (const type of activityTypes) {
+            if (project[`${type.id}Start`] && project[`${type.id}End`] && overlapsTimeline(project[`${type.id}Start`], project[`${type.id}End`])) {
+                return true;
+            }
+        }
+
+        if (project.customActivities && Array.isArray(project.customActivities)) {
+            for (const activity of project.customActivities) {
+                if (activity.startDate && activity.endDate && overlapsTimeline(activity.startDate, activity.endDate)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // Update zoom level
     function updateZoom(newZoomLevel) {
         // Limit zoom between 20% and 400%
@@ -352,14 +388,32 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Get the same width as timeline
         const timelineWidth = timelineDates.style.width;
-        
-        projects.forEach((project, index) => {
+        const visibleProjects = projects
+            .map((project, index) => ({ project, index }))
+            .filter(({ project }) => hasVisibleProjectActivity(project));
+
+        if (visibleProjects.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'empty-message';
+            emptyMessage.textContent = 'No projects in the selected time window.';
+            projectsContainer.appendChild(emptyMessage);
+            return;
+        }
+
+        visibleProjects.forEach(({ project, index }) => {
             const projectRow = document.createElement('div');
             projectRow.className = 'project-row';
             
             // Add potential class if project is marked as potential
             if (project.potential) {
                 projectRow.classList.add('potential');
+            }
+
+            const hasBelowCustomActivity = Array.isArray(project.customActivities)
+                && project.customActivities.some(customActivity => customActivity && customActivity.showBelow === true);
+
+            if (hasBelowCustomActivity) {
+                projectRow.classList.add('has-below-row');
             }
             
             // Add project name
@@ -403,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     activityBar.dataset.end = endDateStr;
                     activityBar.style.left = `${startPosition}px`;
                     activityBar.style.width = `${Math.max(width, minWidth)}px`;
+                    activityBar.style.top = '10px';
                     
                     const activityLabel = document.createElement('div');
                     activityLabel.className = 'activity-label';
@@ -433,21 +488,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Find the activity type to get the color
                         const activityType = activityTypes.find(type => type.id === customActivity.type);
                         if (!activityType) return;
-                        
+
                         // Get date objects for calculations
                         const startDate = dayjs(customActivity.startDate).startOf('day');
                         const endDate = dayjs(customActivity.endDate).startOf('day');
-                        
+
                         // Calculate positions
                         const startPosition = getPositionFromDate(startDate);
-                        
+
                         // Calculate width
                         const daysDiff = endDate.diff(startDate, 'day');
                         const width = (daysDiff + 1) * pixelsPerDay;
-                        
+
                         // Minimum visual width
                         const minWidth = Math.max(20, pixelsPerDay);
-                        
+
                         const activityBar = document.createElement('div');
                         activityBar.className = `activity-bar ${activityType.id} custom-activity`;
                         activityBar.dataset.project = index;
@@ -458,22 +513,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         activityBar.dataset.activityType = customActivity.type;
                         activityBar.style.left = `${startPosition}px`;
                         activityBar.style.width = `${Math.max(width, minWidth)}px`;
-                        
+                        activityBar.style.top = customActivity.showBelow ? '50px' : '10px';
+
                         const activityLabel = document.createElement('div');
                         activityLabel.className = 'activity-label';
                         activityLabel.textContent = customActivity.name; // Use the custom name
-                        
+
                         const leftHandle = document.createElement('div');
                         leftHandle.className = 'resize-handle left';
-                        
+
                         const rightHandle = document.createElement('div');
                         rightHandle.className = 'resize-handle right';
-                        
+
                         activityBar.appendChild(leftHandle);
                         activityBar.appendChild(rightHandle);
                         activityBar.appendChild(activityLabel);
                         projectTimeline.appendChild(activityBar);
-                        
+
                         // Add tooltip event listeners
                         activityBar.addEventListener('mouseenter', showTooltip);
                         activityBar.addEventListener('mousemove', moveTooltip);
@@ -818,6 +874,24 @@ document.addEventListener('DOMContentLoaded', () => {
         
         dateContainer.appendChild(startContainer);
         dateContainer.appendChild(endContainer);
+
+        // Optional below-lane toggle
+        const belowContainer = document.createElement('div');
+        belowContainer.className = 'form-group custom-below-option';
+
+        const belowLabel = document.createElement('label');
+        belowLabel.className = 'custom-below-label';
+
+        const belowInput = document.createElement('input');
+        belowInput.type = 'checkbox';
+        belowInput.className = 'custom-show-below';
+
+        const belowLabelText = document.createElement('span');
+        belowLabelText.textContent = 'Below (show on second activity lane)';
+
+        belowLabel.appendChild(belowInput);
+        belowLabel.appendChild(belowLabelText);
+        belowContainer.appendChild(belowLabel);
         
         // Remove button
         const removeBtn = document.createElement('button');
@@ -832,6 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
         customActivityRow.appendChild(nameContainer);
         customActivityRow.appendChild(typeContainer);
         customActivityRow.appendChild(dateContainer);
+        customActivityRow.appendChild(belowContainer);
         customActivityRow.appendChild(removeBtn);
         
         // Add the row to the container
@@ -900,6 +975,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastRow.querySelector('.custom-type').value = customActivity.type;
                 lastRow.querySelector('.custom-start').value = customActivity.startDate;
                 lastRow.querySelector('.custom-end').value = customActivity.endDate;
+                lastRow.querySelector('.custom-show-below').checked = customActivity.showBelow === true;
             });
         }
         
@@ -964,13 +1040,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = row.querySelector('.custom-type').value;
             const startDate = row.querySelector('.custom-start').value;
             const endDate = row.querySelector('.custom-end').value;
+            const showBelow = row.querySelector('.custom-show-below').checked;
             
             if (name && type && startDate && endDate) {
                 projectData.customActivities.push({
                     name: name,
                     type: type,
                     startDate: startDate,
-                    endDate: endDate
+                    endDate: endDate,
+                    showBelow: showBelow
                 });
             }
         });
