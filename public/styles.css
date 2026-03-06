@@ -411,6 +411,25 @@ input[type="date"] {
     background-color: #169e6c;
 }
 
+.timeline-nav-controls {
+    margin: 4px auto 14px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+#shift-window-back,
+#shift-window-forward {
+    font-size: 12px;
+    padding: 5px 10px;
+    background-color: #6b7280;
+}
+
+#shift-window-back:hover,
+#shift-window-forward:hover {
+    background-color: #4b5563;
+}
+
 /* Checkbox styling */
 .checkbox-group input[type="checkbox"] {
     width: auto;

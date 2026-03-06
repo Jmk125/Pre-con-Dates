@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pastWindowMonthsInput = document.getElementById('past-window-months');
     const futureBufferMonthsInput = document.getElementById('future-buffer-months');
     const applyTimeWindowBtn = document.getElementById('apply-time-window');
+    const shiftWindowBackBtn = document.getElementById('shift-window-back');
+    const shiftWindowForwardBtn = document.getElementById('shift-window-forward');
     const deleteProjectBtn = document.getElementById('delete-project');
     const currentUser = document.getElementById('current-user');
     const currentDateTime = document.getElementById('current-datetime');
@@ -110,6 +112,19 @@ document.addEventListener('DOMContentLoaded', () => {
         futureBufferMonthsInput.value = futureBufferMonths;
 
         renderTimeline();
+    });
+    function shiftTimelineWindow(monthDelta) {
+        currentDate = currentDate.add(monthDelta, 'month');
+        currentDateInput.value = currentDate.format('YYYY-MM-DD');
+        renderTimeline();
+    }
+
+    shiftWindowBackBtn.addEventListener('click', () => {
+        shiftTimelineWindow(-1);
+    });
+
+    shiftWindowForwardBtn.addEventListener('click', () => {
+        shiftTimelineWindow(1);
     });
     
     // Calculate date range based on all projects
