@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const staffAddForm = document.getElementById('staff-add-form');
     const staffNameInput = document.getElementById('staff-name-input');
     const staffColorInput = document.getElementById('staff-color-input');
-    const projectEstimatorSelect = document.getElementById('project-estimator');
+    const projectEstimatorsContainer = document.getElementById('project-estimators');
     
     // Initialize datetime display (username will be set on publish or load)
     const currentTimeFormatted = '2025-04-22 20:56:31'; // Using the provided timestamp
@@ -399,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createEstimatorLegend() {
         staff.forEach(member => addLegendItem(member.name, member.color));
         
-        if (projects.some(project => !getStaffMember(project.estimatorId))) {
+        if (projects.some(project => getProjectEstimators(project).length === 0)) {
             addLegendItem('Unassigned', UNASSIGNED_COLOR);
         }
     }
@@ -596,13 +596,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Dates come from the bar's data (updated live while dragging), not from pixels
         const project = projects[parseInt(bar.dataset.project)];
-        const estimator = project ? getStaffMember(project.estimatorId) : null;
+        const estimators = project ? getProjectEstimators(project) : [];
 
         tooltip.innerHTML = `
             <strong>${escapeHtml(activityName)}</strong><br>
             Start: ${formatDate(bar.dataset.start)}<br>
             End: ${formatDate(bar.dataset.end)}<br>
-            Estimator: ${estimator ? escapeHtml(estimator.name) : 'Unassigned'}
+            ${estimators.length > 1 ? 'Estimators' : 'Estimator'}: ${estimators.length > 0 ? estimators.map(m => escapeHtml(m.name)).join(', ') : 'Unassigned'}
         `;
     }
     
@@ -639,11 +639,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return staff.find(member => member.id === id) || null;
     }
     
-    // In estimator mode, override the activity color with the estimator's color
+    // Estimator ids for a project (also reads the older single-estimator field)
+    function getProjectEstimatorIds(project) {
+        if (Array.isArray(project.estimatorIds)) return project.estimatorIds;
+        return project.estimatorId ? [project.estimatorId] : [];
+    }
+    
+    // Assigned staff members that still exist, in staff-list order
+    function getProjectEstimators(project) {
+        const ids = getProjectEstimatorIds(project);
+        return staff.filter(member => ids.includes(member.id));
+    }
+    
+    function isAssignedTo(project, staffId) {
+        return getProjectEstimatorIds(project).includes(staffId);
+    }
+    
+    // In estimator mode, override the activity color with the estimators' colors.
+    // Several estimators are shown as diagonal stripes, one stripe per person.
     function applyBarColor(bar, project) {
         if (colorMode !== 'estimator') return;
-        const estimator = getStaffMember(project.estimatorId);
-        bar.style.backgroundColor = estimator ? estimator.color : UNASSIGNED_COLOR;
+        const estimators = getProjectEstimators(project);
+        
+        if (estimators.length === 0) {
+            bar.style.background = UNASSIGNED_COLOR;
+        } else if (estimators.length === 1) {
+            bar.style.background = estimators[0].color;
+        } else {
+            const stripeWidth = 8;
+            const stops = estimators.map((member, i) =>
+                `${member.color} ${i * stripeWidth}px ${(i + 1) * stripeWidth}px`);
+            bar.style.background = `repeating-linear-gradient(45deg, ${stops.join(', ')})`;
+        }
     }
     
     function updateColorModeButton() {
@@ -716,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderTimeline();
             });
             
-            const assignedCount = projects.filter(project => project.estimatorId === member.id).length;
+            const assignedCount = projects.filter(project => isAssignedTo(project, member.id)).length;
             const count = document.createElement('span');
             count.className = 'staff-count';
             count.textContent = `${assignedCount} project${assignedCount === 1 ? '' : 's'}`;
@@ -758,14 +785,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const member = getStaffMember(id);
         if (!member) return;
         
-        const assigned = projects.filter(project => project.estimatorId === id);
+        const assigned = projects.filter(project => isAssignedTo(project, id));
         const message = assigned.length > 0
-            ? `Remove "${member.name}"? ${assigned.length} project(s) will become unassigned.`
+            ? `Remove "${member.name}"? They will be unassigned from ${assigned.length} project(s).`
             : `Remove "${member.name}"?`;
         if (!confirm(message)) return;
         
         staff = staff.filter(m => m.id !== id);
-        assigned.forEach(project => { delete project.estimatorId; });
+        assigned.forEach(project => {
+            project.estimatorIds = getProjectEstimatorIds(project).filter(staffId => staffId !== id);
+            delete project.estimatorId;
+        });
         markAsUnsaved();
         renderStaffList();
         renderTimeline();
@@ -778,23 +808,39 @@ document.addEventListener('DOMContentLoaded', () => {
         staffNameInput.focus();
     }
     
-    // Fill the estimator dropdown in the project form
-    function populateEstimatorSelect(selectedId) {
-        projectEstimatorSelect.innerHTML = '';
+    // Fill the estimator checkboxes in the project form
+    function populateEstimatorChoices(selectedIds) {
+        projectEstimatorsContainer.innerHTML = '';
         
-        const unassigned = document.createElement('option');
-        unassigned.value = '';
-        unassigned.textContent = staff.length === 0 ? 'Unassigned (add staff with the ⚙ button)' : 'Unassigned';
-        projectEstimatorSelect.appendChild(unassigned);
+        if (staff.length === 0) {
+            const hint = document.createElement('span');
+            hint.className = 'checkbox-hint';
+            hint.textContent = 'No staff yet - add people with the ⚙ button.';
+            projectEstimatorsContainer.appendChild(hint);
+            return;
+        }
         
         staff.forEach(member => {
-            const option = document.createElement('option');
-            option.value = member.id;
-            option.textContent = member.name;
-            projectEstimatorSelect.appendChild(option);
+            const option = document.createElement('label');
+            option.className = 'estimator-option';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = member.id;
+            checkbox.checked = selectedIds.includes(member.id);
+            
+            const swatch = document.createElement('span');
+            swatch.className = 'estimator-swatch';
+            swatch.style.backgroundColor = member.color;
+            
+            const name = document.createElement('span');
+            name.textContent = member.name;
+            
+            option.appendChild(checkbox);
+            option.appendChild(swatch);
+            option.appendChild(name);
+            projectEstimatorsContainer.appendChild(option);
         });
-        
-        projectEstimatorSelect.value = getStaffMember(selectedId) ? selectedId : '';
     }
     
     // Initialize draggable activities with improved drag handling
@@ -1098,7 +1144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modalTitle.textContent = 'Add Project';
         projectForm.reset();
         editingIndex = null;
-        populateEstimatorSelect('');
+        populateEstimatorChoices([]);
         
         // Initialize custom activities section
         initCustomActivitiesSection();
@@ -1116,7 +1162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.getElementById('project-name').value = project.name;
         document.getElementById('project-potential').checked = project.potential || false;
-        populateEstimatorSelect(project.estimatorId);
+        populateEstimatorChoices(getProjectEstimatorIds(project));
         
         // Initialize custom activities section
         initCustomActivitiesSection();
@@ -1187,9 +1233,8 @@ document.addEventListener('DOMContentLoaded', () => {
             potential: document.getElementById('project-potential').checked
         };
         
-        if (projectEstimatorSelect.value) {
-            projectData.estimatorId = projectEstimatorSelect.value;
-        }
+        projectData.estimatorIds = [...projectEstimatorsContainer.querySelectorAll('input[type="checkbox"]:checked')]
+            .map(checkbox => checkbox.value);
         
         // Save standard activities
         activityTypes.forEach(type => {
