@@ -21,6 +21,7 @@
                 <button id="export-data">Export Projects</button>
                 <button id="load-data">Load Projects</button>
                 <button id="publish-data" class="publish-btn">Publish</button>
+                <button id="color-mode-toggle" title="Switch between coloring bars by activity or by estimator">Color by: Activity</button>
                 <input type="file" id="file-input" style="display: none;">
             </div>
             
@@ -29,6 +30,7 @@
                 <span id="zoom-level">100%</span>
                 <button id="zoom-in">+</button>
                 <button id="zoom-fit">Fit All</button>
+                <button id="staff-settings" class="gear-btn" title="Manage staff" aria-label="Manage staff">&#9881;</button>
             </div>
         </div>
 
@@ -79,6 +81,11 @@
                             <input type="text" id="project-name" required>
                         </div>
                         
+                        <div class="form-group">
+                            <label for="project-estimator">Estimator:</label>
+                            <select id="project-estimator"></select>
+                        </div>
+                        
                         <div class="form-group checkbox-group">
                             <label for="project-potential">Potential Project:</label>
                             <input type="checkbox" id="project-potential">
@@ -121,6 +128,21 @@
                             <button type="button" id="delete-project" class="delete-btn">Delete Project</button>
                         </div>
                     </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Staff settings modal -->
+        <div id="staff-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" id="staff-modal-close">&times;</span>
+                <h2>Staff</h2>
+                <p class="staff-hint">Add estimators and pick a color for each. Assign them to projects in the project form.</p>
+                <div id="staff-list" class="staff-list"></div>
+                <form id="staff-add-form" class="staff-add-form">
+                    <input type="text" id="staff-name-input" placeholder="Name" required>
+                    <input type="color" id="staff-color-input" value="#4e73df" title="Color">
+                    <button type="submit">Add Staff</button>
                 </form>
             </div>
         </div>

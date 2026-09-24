@@ -29,6 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const projectPotentialCheckbox = document.getElementById('project-potential');
     const tooltip = document.getElementById('tooltip');
     const addCustomActivityBtn = document.getElementById('add-custom-activity');
+    const colorModeToggleBtn = document.getElementById('color-mode-toggle');
+    const staffSettingsBtn = document.getElementById('staff-settings');
+    const staffModal = document.getElementById('staff-modal');
+    const staffModalClose = document.getElementById('staff-modal-close');
+    const staffList = document.getElementById('staff-list');
+    const staffAddForm = document.getElementById('staff-add-form');
+    const staffNameInput = document.getElementById('staff-name-input');
+    const staffColorInput = document.getElementById('staff-color-input');
+    const projectEstimatorSelect = document.getElementById('project-estimator');
     
     // Initialize datetime display (username will be set on publish or load)
     const currentTimeFormatted = '2025-04-22 20:56:31'; // Using the provided timestamp
@@ -47,6 +56,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let isResizingLeft = false;
     let isResizingRight = false;
     let hasUnsavedChanges = false; // Track whether there are unsaved changes
+    let staff = []; // Estimators: { id, name, color }
+    let colorMode = 'activity'; // 'activity' or 'estimator'
+    
+    // Remember the color mode per browser (a viewing preference, not project data)
+    try {
+        if (localStorage.getItem('colorMode') === 'estimator') colorMode = 'estimator';
+    } catch (e) { /* storage unavailable - use default */ }
+    
+    const UNASSIGNED_COLOR = '#9ca3af';
+    const defaultStaffColors = ['#4e73df', '#1cc88a', '#e74a3b', '#f6c23e', '#8e44ad', '#fd7e14', '#20c9a6', '#e83e8c', '#6f42c1', '#5a5c69'];
     
     // Current date (can be updated by user)
     let currentDate = dayjs();
@@ -249,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTimeline() {
         initTimelineDates();
         renderProjects();
+        createLegend();
         
         // Update visual indicator for unsaved changes
         updateUnsavedChangesIndicator();
@@ -324,19 +344,67 @@ document.addEventListener('DOMContentLoaded', () => {
         return days * pixelsPerDay;
     }
     
-    // Calculate date from position
-    function getDateFromPosition(position) {
-        // Calculate days from position
-        const days = Math.round(position / pixelsPerDay);
-        
-        // Calculate exact date
-        return startDate.clone().add(days, 'day').format('YYYY-MM-DD');
+    // Position and size a bar from its (inclusive) start and end dates
+    function positionBar(bar, startDateStr, endDateStr) {
+        const barStart = dayjs(startDateStr).startOf('day');
+        const barEnd = dayjs(endDateStr).startOf('day');
+        const width = (barEnd.diff(barStart, 'day') + 1) * pixelsPerDay;
+        const minWidth = Math.max(20, pixelsPerDay);
+
+        bar.style.left = `${getPositionFromDate(barStart)}px`;
+        bar.style.width = `${Math.max(width, minWidth)}px`;
     }
     
     // Create legend (once)
     function createLegend() {
         legendContainer.innerHTML = '';
         
+        if (colorMode === 'estimator') {
+            createEstimatorLegend();
+        } else {
+            createActivityLegend();
+        }
+        
+        // Add potential project legend item
+        const potentialLegendItem = document.createElement('div');
+        potentialLegendItem.className = 'legend-item';
+        
+        const potentialLegendColor = document.createElement('div');
+        potentialLegendColor.className = 'legend-color potential';
+        
+        const potentialLegendLabel = document.createElement('div');
+        potentialLegendLabel.textContent = 'Potential Project';
+        
+        potentialLegendItem.appendChild(potentialLegendColor);
+        potentialLegendItem.appendChild(potentialLegendLabel);
+        legendContainer.appendChild(potentialLegendItem);
+    }
+    
+    function addLegendItem(label, color) {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item';
+        
+        const legendColor = document.createElement('div');
+        legendColor.className = 'legend-color';
+        legendColor.style.backgroundColor = color;
+        
+        const legendLabel = document.createElement('div');
+        legendLabel.textContent = label;
+        
+        legendItem.appendChild(legendColor);
+        legendItem.appendChild(legendLabel);
+        legendContainer.appendChild(legendItem);
+    }
+    
+    function createEstimatorLegend() {
+        staff.forEach(member => addLegendItem(member.name, member.color));
+        
+        if (projects.some(project => !getStaffMember(project.estimatorId))) {
+            addLegendItem('Unassigned', UNASSIGNED_COLOR);
+        }
+    }
+    
+    function createActivityLegend() {
         // Add activity type legend items
         activityTypes.forEach(type => {
             const legendItem = document.createElement('div');
@@ -352,20 +420,6 @@ document.addEventListener('DOMContentLoaded', () => {
             legendItem.appendChild(legendLabel);
             legendContainer.appendChild(legendItem);
         });
-        
-        // Add potential project legend item
-        const potentialLegendItem = document.createElement('div');
-        potentialLegendItem.className = 'legend-item';
-        
-        const potentialLegendColor = document.createElement('div');
-        potentialLegendColor.className = 'legend-color potential';
-        
-        const potentialLegendLabel = document.createElement('div');
-        potentialLegendLabel.textContent = 'Potential Project';
-        
-        potentialLegendItem.appendChild(potentialLegendColor);
-        potentialLegendItem.appendChild(potentialLegendLabel);
-        legendContainer.appendChild(potentialLegendItem);
     }
     
     // Render projects with correct bar positioning
@@ -430,28 +484,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const startDateStr = project[`${type.id}Start`];
                     const endDateStr = project[`${type.id}End`];
                     
-                    // Get date objects for calculations
-                    const startDate = dayjs(startDateStr).startOf('day');
-                    const endDate = dayjs(endDateStr).startOf('day');
-                    
-                    // Calculate positions using our consistent function
-                    const startPosition = getPositionFromDate(startDate);
-                    
-                    // Calculate width based on inclusive date range (include end date)
-                    const daysDiff = endDate.diff(startDate, 'day');
-                    const width = (daysDiff + 1) * pixelsPerDay;
-                    
-                    // Minimum visual width
-                    const minWidth = Math.max(20, pixelsPerDay);
-                    
                     const activityBar = document.createElement('div');
                     activityBar.className = `activity-bar ${type.id}`;
                     activityBar.dataset.project = index;
                     activityBar.dataset.activity = type.id;
                     activityBar.dataset.start = startDateStr;
                     activityBar.dataset.end = endDateStr;
-                    activityBar.style.left = `${startPosition}px`;
-                    activityBar.style.width = `${Math.max(width, minWidth)}px`;
+                    positionBar(activityBar, startDateStr, endDateStr);
+                    applyBarColor(activityBar, project);
                     activityBar.style.top = '10px';
                     
                     const activityLabel = document.createElement('div');
@@ -484,20 +524,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         const activityType = activityTypes.find(type => type.id === customActivity.type);
                         if (!activityType) return;
 
-                        // Get date objects for calculations
-                        const startDate = dayjs(customActivity.startDate).startOf('day');
-                        const endDate = dayjs(customActivity.endDate).startOf('day');
-
-                        // Calculate positions
-                        const startPosition = getPositionFromDate(startDate);
-
-                        // Calculate width
-                        const daysDiff = endDate.diff(startDate, 'day');
-                        const width = (daysDiff + 1) * pixelsPerDay;
-
-                        // Minimum visual width
-                        const minWidth = Math.max(20, pixelsPerDay);
-
                         const activityBar = document.createElement('div');
                         activityBar.className = `activity-bar ${activityType.id} custom-activity`;
                         activityBar.dataset.project = index;
@@ -506,8 +532,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         activityBar.dataset.end = customActivity.endDate;
                         activityBar.dataset.activityName = customActivity.name;
                         activityBar.dataset.activityType = customActivity.type;
-                        activityBar.style.left = `${startPosition}px`;
-                        activityBar.style.width = `${Math.max(width, minWidth)}px`;
+                        positionBar(activityBar, customActivity.startDate, customActivity.endDate);
+                        applyBarColor(activityBar, project);
                         activityBar.style.top = customActivity.showBelow ? '50px' : '10px';
 
                         const activityLabel = document.createElement('div');
@@ -568,22 +594,15 @@ document.addEventListener('DOMContentLoaded', () => {
             activityName = activity.name;
         }
         
-        // Calculate current dates based on position
-        const left = parseInt(bar.style.left) || 0;
-        const width = parseInt(bar.style.width) || 0;
-        
-        // For tooltips, get start date from left position
-        const startDate = getDateFromPosition(left);
-        
-        // For end date, calculate from the right edge minus one pixel
-        // This ensures we're showing the actual end date, not the next day
-        const endDate = getDateFromPosition(left + width - 1);
-        
-        // Update tooltip content
+        // Dates come from the bar's data (updated live while dragging), not from pixels
+        const project = projects[parseInt(bar.dataset.project)];
+        const estimator = project ? getStaffMember(project.estimatorId) : null;
+
         tooltip.innerHTML = `
-            <strong>${activityName}</strong><br>
-            Start: ${formatDate(startDate)}<br>
-            End: ${formatDate(endDate)}
+            <strong>${escapeHtml(activityName)}</strong><br>
+            Start: ${formatDate(bar.dataset.start)}<br>
+            End: ${formatDate(bar.dataset.end)}<br>
+            Estimator: ${estimator ? escapeHtml(estimator.name) : 'Unassigned'}
         `;
     }
     
@@ -605,6 +624,177 @@ document.addEventListener('DOMContentLoaded', () => {
     function formatDate(dateStr) {
         const date = dayjs(dateStr);
         return date.format('MMM D, YYYY');
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    }
+    
+    // ---- Staff / estimator coloring ----
+    
+    function getStaffMember(id) {
+        if (!id) return null;
+        return staff.find(member => member.id === id) || null;
+    }
+    
+    // In estimator mode, override the activity color with the estimator's color
+    function applyBarColor(bar, project) {
+        if (colorMode !== 'estimator') return;
+        const estimator = getStaffMember(project.estimatorId);
+        bar.style.backgroundColor = estimator ? estimator.color : UNASSIGNED_COLOR;
+    }
+    
+    function updateColorModeButton() {
+        colorModeToggleBtn.textContent = colorMode === 'estimator' ? 'Color by: Estimator' : 'Color by: Activity';
+        colorModeToggleBtn.classList.toggle('estimator-mode', colorMode === 'estimator');
+    }
+    
+    function toggleColorMode() {
+        colorMode = colorMode === 'estimator' ? 'activity' : 'estimator';
+        try {
+            localStorage.setItem('colorMode', colorMode);
+        } catch (e) { /* storage unavailable - mode just won't persist */ }
+        updateColorModeButton();
+        renderTimeline();
+    }
+    
+    function normalizeStaff(list) {
+        if (!Array.isArray(list)) return [];
+        return list
+            .filter(member => member && member.id && member.name)
+            .map(member => ({
+                id: String(member.id),
+                name: String(member.name),
+                color: /^#[0-9a-fA-F]{6}$/.test(member.color) ? member.color : UNASSIGNED_COLOR
+            }));
+    }
+    
+    function nextDefaultStaffColor() {
+        const used = new Set(staff.map(member => member.color.toLowerCase()));
+        return defaultStaffColors.find(color => !used.has(color)) || defaultStaffColors[staff.length % defaultStaffColors.length];
+    }
+    
+    function renderStaffList() {
+        staffList.innerHTML = '';
+        
+        if (staff.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'staff-empty';
+            empty.textContent = 'No staff yet.';
+            staffList.appendChild(empty);
+            return;
+        }
+        
+        staff.forEach(member => {
+            const row = document.createElement('div');
+            row.className = 'staff-row';
+            
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = member.color;
+            colorInput.title = 'Change color';
+            colorInput.addEventListener('input', () => {
+                member.color = colorInput.value;
+                markAsUnsaved();
+                renderTimeline();
+            });
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = member.name;
+            nameInput.className = 'staff-name';
+            nameInput.addEventListener('change', () => {
+                const newName = nameInput.value.trim();
+                if (!newName) {
+                    nameInput.value = member.name;
+                    return;
+                }
+                member.name = newName;
+                markAsUnsaved();
+                renderTimeline();
+            });
+            
+            const assignedCount = projects.filter(project => project.estimatorId === member.id).length;
+            const count = document.createElement('span');
+            count.className = 'staff-count';
+            count.textContent = `${assignedCount} project${assignedCount === 1 ? '' : 's'}`;
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn-danger staff-remove';
+            removeBtn.textContent = 'Remove';
+            removeBtn.addEventListener('click', () => removeStaffMember(member.id));
+            
+            row.appendChild(colorInput);
+            row.appendChild(nameInput);
+            row.appendChild(count);
+            row.appendChild(removeBtn);
+            staffList.appendChild(row);
+        });
+    }
+    
+    function addStaffMember(e) {
+        e.preventDefault();
+        const name = staffNameInput.value.trim();
+        if (!name) return;
+        
+        staff.push({
+            id: 'staff-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            name: name,
+            color: staffColorInput.value
+        });
+        
+        staffNameInput.value = '';
+        staffColorInput.value = nextDefaultStaffColor();
+        markAsUnsaved();
+        renderStaffList();
+        renderTimeline();
+        staffNameInput.focus();
+    }
+    
+    function removeStaffMember(id) {
+        const member = getStaffMember(id);
+        if (!member) return;
+        
+        const assigned = projects.filter(project => project.estimatorId === id);
+        const message = assigned.length > 0
+            ? `Remove "${member.name}"? ${assigned.length} project(s) will become unassigned.`
+            : `Remove "${member.name}"?`;
+        if (!confirm(message)) return;
+        
+        staff = staff.filter(m => m.id !== id);
+        assigned.forEach(project => { delete project.estimatorId; });
+        markAsUnsaved();
+        renderStaffList();
+        renderTimeline();
+    }
+    
+    function showStaffModal() {
+        renderStaffList();
+        staffColorInput.value = nextDefaultStaffColor();
+        staffModal.style.display = 'block';
+        staffNameInput.focus();
+    }
+    
+    // Fill the estimator dropdown in the project form
+    function populateEstimatorSelect(selectedId) {
+        projectEstimatorSelect.innerHTML = '';
+        
+        const unassigned = document.createElement('option');
+        unassigned.value = '';
+        unassigned.textContent = staff.length === 0 ? 'Unassigned (add staff with the ⚙ button)' : 'Unassigned';
+        projectEstimatorSelect.appendChild(unassigned);
+        
+        staff.forEach(member => {
+            const option = document.createElement('option');
+            option.value = member.id;
+            option.textContent = member.name;
+            projectEstimatorSelect.appendChild(option);
+        });
+        
+        projectEstimatorSelect.value = getStaffMember(selectedId) ? selectedId : '';
     }
     
     // Initialize draggable activities with improved drag handling
@@ -646,10 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Store initial state
-        const rect = activeBar.getBoundingClientRect();
         activeBar.dataset.startX = e.clientX;
-        activeBar.dataset.initialLeft = parseInt(activeBar.style.left) || 0;
-        activeBar.dataset.initialWidth = parseInt(activeBar.style.width) || rect.width;
         
         // Store original dates
         activeBar.dataset.originalStart = activeBar.dataset.start;
@@ -668,34 +855,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function documentMouseMove(e) {
         if (!activeBar || (!isDragging && !isResizingLeft && !isResizingRight)) return;
         
-        // Calculate movement
-        const startX = parseInt(activeBar.dataset.startX) || 0;
-        const initialLeft = parseInt(activeBar.dataset.initialLeft) || 0;
-        const initialWidth = parseInt(activeBar.dataset.initialWidth) || 100;
-        const dx = e.clientX - startX;
+        // Convert mouse movement into whole days so bars snap to exact dates
+        const startX = parseFloat(activeBar.dataset.startX) || 0;
+        const dayDelta = Math.round((e.clientX - startX) / pixelsPerDay);
+        const originalStart = dayjs(activeBar.dataset.originalStart);
+        const originalEnd = dayjs(activeBar.dataset.originalEnd);
+        let newStart = originalStart;
+        let newEnd = originalEnd;
         
         if (isDragging) {
-            // When dragging, update the left position
-            activeBar.style.left = (initialLeft + dx) + 'px';
+            newStart = originalStart.add(dayDelta, 'day');
+            newEnd = originalEnd.add(dayDelta, 'day');
         } else if (isResizingLeft) {
-            // When resizing from the left, update both left and width
-            const newLeft = initialLeft + dx;
-            const newWidth = initialWidth - dx;
-            
-            // Ensure minimum width
-            if (newWidth >= pixelsPerDay) {
-                activeBar.style.left = newLeft + 'px';
-                activeBar.style.width = newWidth + 'px';
-            }
+            // Start can move up to (but not past) the end date
+            newStart = originalStart.add(dayDelta, 'day');
+            if (newStart.isAfter(originalEnd)) newStart = originalEnd;
         } else if (isResizingRight) {
-            // When resizing from the right, update only the width
-            const newWidth = initialWidth + dx;
-            
-            // Ensure minimum width
-            if (newWidth >= pixelsPerDay) {
-                activeBar.style.width = newWidth + 'px';
-            }
+            // End can move back to (but not before) the start date
+            newEnd = originalEnd.add(dayDelta, 'day');
+            if (newEnd.isBefore(originalStart)) newEnd = originalStart;
         }
+        
+        activeBar.dataset.start = newStart.format('YYYY-MM-DD');
+        activeBar.dataset.end = newEnd.format('YYYY-MM-DD');
+        positionBar(activeBar, activeBar.dataset.start, activeBar.dataset.end);
         
         // Update tooltip in real-time during drag/resize
         if (activeBar) {
@@ -714,42 +897,33 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update project data when dragging or resizing ends
             const projectIndex = parseInt(activeBar.dataset.project);
             
-            const left = parseInt(activeBar.style.left);
-            const width = parseInt(activeBar.style.width);
+            // Dates were already snapped to whole days during the drag
+            const newStartDate = activeBar.dataset.start;
+            const newEndDate = activeBar.dataset.end;
+            const changed = newStartDate !== activeBar.dataset.originalStart
+                || newEndDate !== activeBar.dataset.originalEnd;
             
-            // Get the exact new dates based on position
-            const newStartDate = getDateFromPosition(left);
-            
-            // Calculate the end date from right edge minus 1 pixel
-            // This gives us the actual end date, not the day after
-            const newEndDate = getDateFromPosition(left + width - 1);
-            
-            if (activeBar.dataset.customActivity !== undefined) {
-                // Update custom activity
-                const customIndex = parseInt(activeBar.dataset.customActivity);
-                projects[projectIndex].customActivities[customIndex].startDate = newStartDate;
-                projects[projectIndex].customActivities[customIndex].endDate = newEndDate;
+            // A plain click (no movement) must not touch the stored dates
+            if (changed) {
+                if (activeBar.dataset.customActivity !== undefined) {
+                    // Update custom activity
+                    const customIndex = parseInt(activeBar.dataset.customActivity);
+                    projects[projectIndex].customActivities[customIndex].startDate = newStartDate;
+                    projects[projectIndex].customActivities[customIndex].endDate = newEndDate;
+                } else {
+                    // Update standard activity
+                    const activityType = activeBar.dataset.activity;
+                    projects[projectIndex][`${activityType}Start`] = newStartDate;
+                    projects[projectIndex][`${activityType}End`] = newEndDate;
+                }
                 
-                // Update the bar's data attributes
-                activeBar.dataset.start = newStartDate;
-                activeBar.dataset.end = newEndDate;
-            } else {
-                // Update standard activity
-                const activityType = activeBar.dataset.activity;
-                projects[projectIndex][`${activityType}Start`] = newStartDate;
-                projects[projectIndex][`${activityType}End`] = newEndDate;
+                // Mark as having unsaved changes instead of auto-saving
+                markAsUnsaved();
                 
-                // Update the bar's data attributes
-                activeBar.dataset.start = newStartDate;
-                activeBar.dataset.end = newEndDate;
-            }
-            
-            // Mark as having unsaved changes instead of auto-saving
-            markAsUnsaved();
-            
-            // Check if we need to redraw the timeline
-            if (dayjs(newStartDate).isBefore(startDate) || dayjs(newEndDate).isAfter(endDate)) {
-                renderTimeline();
+                // Check if we need to redraw the timeline
+                if (dayjs(newStartDate).isBefore(startDate) || dayjs(newEndDate).isAfter(endDate)) {
+                    renderTimeline();
+                }
             }
         }
         
@@ -924,6 +1098,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modalTitle.textContent = 'Add Project';
         projectForm.reset();
         editingIndex = null;
+        populateEstimatorSelect('');
         
         // Initialize custom activities section
         initCustomActivitiesSection();
@@ -941,6 +1116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.getElementById('project-name').value = project.name;
         document.getElementById('project-potential').checked = project.potential || false;
+        populateEstimatorSelect(project.estimatorId);
         
         // Initialize custom activities section
         initCustomActivitiesSection();
@@ -1010,6 +1186,10 @@ document.addEventListener('DOMContentLoaded', () => {
             name: document.getElementById('project-name').value,
             potential: document.getElementById('project-potential').checked
         };
+        
+        if (projectEstimatorSelect.value) {
+            projectData.estimatorId = projectEstimatorSelect.value;
+        }
         
         // Save standard activities
         activityTypes.forEach(type => {
@@ -1099,6 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create data structure with metadata
         const saveData = {
             projects: projects,
+            staff: staff,
             metadata: {
                 publishedBy: userInitials,
                 publishedAt: publishDateTime
@@ -1189,6 +1370,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Handle the data format
                 if (data.projects && Array.isArray(data.projects)) {
                     projects = data.projects;
+                    staff = normalizeStaff(data.staff);
                     
                     // Update user info display if metadata is available
                     if (data.metadata) {
@@ -1242,7 +1424,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Export data to file
     function exportDataToFile() {
-        const dataStr = JSON.stringify(projects, null, 2);
+        const dataStr = JSON.stringify({ projects: projects, staff: staff }, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         const url = URL.createObjectURL(dataBlob);
         
@@ -1269,6 +1451,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         projects = loadedProjects;
                     } else if (loadedProjects.projects && Array.isArray(loadedProjects.projects)) {
                         projects = loadedProjects.projects;
+                        // Keep the current staff list if the file doesn't include one
+                        if (Array.isArray(loadedProjects.staff)) {
+                            staff = normalizeStaff(loadedProjects.staff);
+                        }
                     } else {
                         throw new Error('Invalid file format');
                     }
@@ -1308,6 +1494,15 @@ document.addEventListener('DOMContentLoaded', () => {
     zoomOutBtn.addEventListener('click', () => updateZoom(zoomLevel - 20));
     zoomFitBtn.addEventListener('click', zoomToFit);
     
+    // Staff and color mode
+    colorModeToggleBtn.addEventListener('click', toggleColorMode);
+    staffSettingsBtn.addEventListener('click', showStaffModal);
+    staffAddForm.addEventListener('submit', addStaffMember);
+    staffModalClose.addEventListener('click', () => {
+        staffModal.style.display = 'none';
+    });
+    updateColorModeButton();
+    
     modalClose.addEventListener('click', () => {
         modal.style.display = 'none';
     });
@@ -1315,6 +1510,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('click', (event) => {
         if (event.target === modal) {
             modal.style.display = 'none';
+        }
+        if (event.target === staffModal) {
+            staffModal.style.display = 'none';
         }
     });
     

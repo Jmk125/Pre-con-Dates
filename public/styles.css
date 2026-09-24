@@ -103,6 +103,7 @@ button:hover {
 
 .project-name-header {
     width: var(--project-name-width);
+    flex: 0 0 var(--project-name-width); /* Never shrink, or the date header and bars drift apart */
     padding: 15px 10px;
     font-weight: bold;
     background-color: #f0f0f0;
@@ -144,6 +145,7 @@ button:hover {
 /* Project rows */
 .project-row {
     display: flex;
+    overflow: hidden;
     border-bottom: 1px solid #eee;
     height: 50px;
     width: 100%;
@@ -155,6 +157,7 @@ button:hover {
 
 .project-name {
     width: var(--project-name-width);
+    flex: 0 0 var(--project-name-width); /* Must match .project-name-header exactly */
     padding: 15px 10px;
     font-weight: 600;
     color: #2f4fb8;
@@ -181,7 +184,7 @@ button:hover {
 }
 
 .project-timeline {
-    flex-grow: 1;
+    flex: 0 0 auto; /* Keep the explicit pixel width set in JS */
     position: relative;
     height: 100%;
     overflow: hidden; /* No scrolling */
@@ -724,4 +727,105 @@ input[type="date"] {
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
+}
+
+/* Staff settings gear button */
+.zoom-controls .gear-btn {
+    background-color: #6b7280;
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 9px;
+    margin-left: 5px;
+}
+
+.zoom-controls .gear-btn:hover {
+    background-color: #4b5563;
+}
+
+/* Color mode toggle */
+#color-mode-toggle {
+    background-color: #6b7280;
+}
+
+#color-mode-toggle:hover {
+    background-color: #4b5563;
+}
+
+#color-mode-toggle.estimator-mode {
+    background-color: #8e44ad;
+}
+
+#color-mode-toggle.estimator-mode:hover {
+    background-color: #71368a;
+}
+
+/* Estimator select in project form */
+#project-estimator {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 200px;
+}
+
+/* Staff modal */
+.staff-hint {
+    font-size: 13px;
+    color: #666;
+    margin: 5px 0 15px;
+}
+
+.staff-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.staff-empty {
+    color: #666;
+    font-style: italic;
+}
+
+.staff-row,
+.staff-add-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.staff-add-form {
+    border-top: 1px solid #ddd;
+    padding-top: 15px;
+}
+
+.staff-row input[type="text"],
+.staff-add-form input[type="text"] {
+    flex: 1;
+    width: auto;
+}
+
+#staff-modal input[type="color"] {
+    width: 40px;
+    height: 34px;
+    padding: 2px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.staff-count {
+    font-size: 12px;
+    color: #666;
+    white-space: nowrap;
+    min-width: 70px;
+}
+
+.staff-remove {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.staff-remove:hover {
+    background-color: #c23321;
 }
